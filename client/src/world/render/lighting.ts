@@ -13,6 +13,7 @@ import type { RoomState } from '../sim/room-state';
 import type { Sim } from '../sim/sim';
 import { buildAnim } from './anim';
 import { ambientAt, ambientDistance, approachAmbient, effectiveHour, isNeutral, mixRgb, rgbCss, sunbeamAt, WHITE, type Ambient, type DaylightMode, type Rgb } from './daylight';
+import type { KuLights } from './ku';
 import { glowSprite } from './props';
 import { furnitureSprites, wallItemOrigin, wallSprites, type AreaVis, type FurnVis, type WallVis } from './scene';
 
@@ -28,7 +29,13 @@ const LAMP_WARM: Rgb = [255, 236, 196];
 const STREET_WARM: Rgb = [255, 214, 150];
 const SCREEN_COOL: Rgb = [196, 222, 255];
 const ARCADE_GLOW: Rgb = [236, 190, 255];
+const WINDOW_WARM: Rgb = [255, 206, 126];
 const FIREFLIES = 26;
+
+/** Algumas janelas ficam apagadas: a escolha vem da posição, então não pisca nem muda de um quadro para o outro. */
+export function windowLit(w: { x: number; y: number }): boolean {
+  return ((Math.imul(Math.round(w.x), 73856093) ^ Math.imul(Math.round(w.y), 19349663)) >>> 0) % 100 < 72;
+}
 
 /** O que a iluminação precisa do renderer (satisfeito pelo próprio Renderer). */
 export interface LightScene {
@@ -37,6 +44,8 @@ export interface LightScene {
   readonly shells: readonly SlotShell[];
   readonly shellWindows: readonly WallVis[];
   readonly cars: readonly { x: number; y: number; dir: 1 | -1; half?: number }[];
+  /** Janelas e postes do campus (ku.ts), para a luz da noite; ausente fora da edição KU. */
+  readonly kuLights?: KuLights | null;
   roomInSlot(slot: number): RoomState | undefined;
   deskScreen(f: FurnVis, area: AreaVis): ScreenMode;
 }
@@ -411,10 +420,30 @@ export class Lighting {
         halo(street, prop.x, prop.y - 30, 30, 24, 0.7 * k);
       } else if (prop.kind === 'totem') halo(cool, prop.x, prop.y - 4, 34, 22, 0.6 * k);
     }
+    this.paintKuLights(scene.kuLights, k, halo, street);
     this.paintWindowSpill(scene, lit, k, halo, street);
     m.globalAlpha = 1;
     m.globalCompositeOperation = 'source-over';
     m.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
+  /** Postes do campus (poça de luz no chão e bulbo) e a claridade em volta das janelas acesas dos edifícios. */
+  private paintKuLights(
+    ku: KuLights | null | undefined,
+    k: number,
+    halo: (img: HTMLCanvasElement, cx: number, cy: number, w: number, h: number, a: number) => void,
+    street: HTMLCanvasElement,
+  ): void {
+    if (!ku) return;
+    for (const l of ku.lamps) {
+      halo(street, l.x, l.y + 30, 110, 76, k);
+      halo(street, l.x, l.y, 28, 22, 0.7 * k);
+    }
+    const win = haloSprite(WINDOW_WARM, 48);
+    for (const w of ku.windows) {
+      if (!windowLit(w)) continue;
+      halo(win, w.x + w.w / 2, w.y + w.h / 2, w.w * 2.6 + 8, w.h * 2.6 + 8, 0.55 * k);
+    }
   }
 
   /** À noite, a luz das janelas e das fachadas de vidro se projeta no gramado e na calçada. */
@@ -501,10 +530,28 @@ export class Lighting {
         ctx.globalAlpha = 0.6 * n;
         ctx.drawImage(warm, Math.round(prop.x - 14), Math.round(prop.y - 43), 28, 28);
       }
+      this.drawKuGlows(ctx, scene.kuLights, view, n, warm);
       this.drawHeadlights(ctx, scene, view, n);
       if (n > 0.6 && !this.reduced) this.drawFireflies(ctx, scene, view, now, (n - 0.6) / 0.4);
     }
     ctx.restore();
+  }
+
+  /** Bulbos dos postes do campus e os vidros acesos das janelas (aditivo, por cima da escuridão). */
+  private drawKuGlows(ctx: CanvasRenderingContext2D, ku: KuLights | null | undefined, view: View, n: number, warm: HTMLCanvasElement): void {
+    if (!ku) return;
+    for (const l of ku.lamps) {
+      if (l.x < view.x0 - 40 || l.x > view.x1 + 40 || l.y < view.y0 - 40 || l.y > view.y1 + 40) continue;
+      ctx.globalAlpha = 0.6 * n;
+      ctx.drawImage(warm, Math.round(l.x - 14), Math.round(l.y - 14), 28, 28);
+    }
+    ctx.fillStyle = '#ffcf78';
+    ctx.globalAlpha = 0.62 * n;
+    for (const w of ku.windows) {
+      if (w.x + w.w < view.x0 || w.x > view.x1 || w.y + w.h < view.y0 || w.y > view.y1 || !windowLit(w)) continue;
+      ctx.fillRect(w.x, w.y, w.w, w.h);
+    }
+    ctx.globalAlpha = 1;
   }
 
   /**

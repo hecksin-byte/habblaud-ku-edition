@@ -27,6 +27,12 @@ def cut_function(text, name, next_marker):
 
 helpers = cut_function(helpers, "modern", "function tiger")
 
+# 창문(arch/rect)과 가로등(lamp)을 그릴 때 밤 조명용 위치를 남긴다(logWin/logLamp는 renderScene 안에 있다)
+helpers = helpers.replace("R(x + 1, y + 2, 1, 3, 'rgba(255,255,255,.35)');\n}", "R(x + 1, y + 2, 1, 3, 'rgba(255,255,255,.35)');\n  logWin(x, y - half + 2, w, h + half - 2);\n}", 1)
+helpers = helpers.replace("R(x, y + Math.floor(h / 2), w, 1, '#d9d5c9');\n}", "R(x, y + Math.floor(h / 2), w, 1, '#d9d5c9');\n  logWin(x, y, w, h);\n}", 1)
+helpers = helpers.replace("R(x + 4, y - 14, 3, 1, '#fff');\n}", "R(x + 4, y - 14, 3, 1, '#fff');\n  logLamp(x + 1, y - 29);\n}", 1)
+assert helpers.count("logWin(") == 2 and helpers.count("logLamp(") == 1, (helpers.count("logWin("), helpers.count("logLamp("))
+
 # 주석 제거(한글 주석 → 포르투갈어 주석은 손으로 다시 단다)
 helpers = re.sub(r"/\*[^*]*\*+(?:[^/*][^*]*\*+)*/", "", helpers)
 helpers = re.sub(r"[ \t]*//[^\n]*", "", helpers)
@@ -137,11 +143,27 @@ export interface KuSprite {
   depth: number;
 }
 
+/** Uma janela (px de mundo): à noite, algumas ficam acesas. */
+export interface KuWindow {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** Fontes de luz da cena: as janelas dos edifícios e o bulbo dos postes (px de mundo). */
+export interface KuLights {
+  windows: KuWindow[];
+  lamps: { x: number; y: number }[];
+}
+
 export interface KuScene {
   lo: HTMLCanvasElement;
   sprites: KuSprite[];
   /** Onde se pode andar, portas, bancos e a faixa de pedestres (ver ku-map.ts). */
   map: KuMap;
+  /** Janelas e postes para a iluminação noturna (client/src/world/render/lighting.ts). */
+  lights: KuLights;
 }
 
 const cache = new Map<string, KuScene>();
@@ -174,6 +196,24 @@ function renderScene(g: KuGeometry): KuScene {
     c.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
   };
   const rnd = mulberry32(0x4b55);
+
+  // Luzes da noite: janelas e postes, em px de mundo. A posição vem da transformação atual do contexto (camadas com
+  // deslocamento) mais a origem do sprite quando se desenha num recorte.
+  const winLights: KuWindow[] = [];
+  const lampLights: { x: number; y: number }[] = [];
+  let lightOrigin = { x: 0, y: 0 };
+  const absArt = (x: number, y: number) => {
+    const t = c.getTransform();
+    return { x: x * t.a + t.e + lightOrigin.x, y: y * t.d + t.f + lightOrigin.y };
+  };
+  const logWin = (x: number, y: number, w: number, h: number) => {
+    const p = absArt(x, y);
+    winLights.push({ x: g.bx + p.x * S, y: g.by + p.y * S, w: w * S, h: h * S });
+  };
+  const logLamp = (x: number, y: number) => {
+    const p = absArt(x, y);
+    lampLights.push({ x: g.bx + p.x * S, y: g.by + p.y * S });
+  };
 
   // Geometria em pixels de arte: prédio, topo da calçada e centro da fileira de edifícios.
   const xL = (g.x0 - g.bx) / S;

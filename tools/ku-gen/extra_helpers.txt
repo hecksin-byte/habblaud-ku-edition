@@ -27,7 +27,10 @@
       R(x + 4, wy, w - 8, 11, '#5e8ea6');
       R(x + 4, wy, w - 8, 3, '#a5cbdc');
       R(x + 4, wy + 8, w - 8, 3, '#4a7890');
-      for (let mx = x + 4; mx < x + w - 4; mx += 12) R(mx, wy, 1, 11, '#dfe3e6');
+      for (let mx = x + 4; mx < x + w - 4; mx += 12) {
+        R(mx, wy, 1, 11, '#dfe3e6');
+        if (mx + 12 <= x + w - 4) logWin(mx + 1, wy + 1, 10, 9);
+      }
       R(x, wy + 12, w, 2, '#9ea3a8');
     }
     R(x + 4, top - 3, w - 8, 3, '#dfe3e6');
@@ -40,6 +43,7 @@
     for (let f = 0; f < floors; f++) {
       R(dx + 3, top + 4 + f * fh, dw - 8, 11, '#6fa3b9');
       R(dx + 3, top + 4 + f * fh, dw - 8, 3, '#b1d3e2');
+      logWin(dx + 3, top + 4 + f * fh, dw - 8, 11);
     }
     R(x + w / 2 - 12, base - 16, 24, 16, '#7fb0d0');
     R(x + w / 2 - 12, base - 16, 24, 3, '#bfdceb');
@@ -103,6 +107,7 @@
       const wy = top + 6 + f * 13;
       for (let wx = x + 5; wx < x + w - 8; wx += 11) {
         R(wx, wy, 7, 8, '#4f6a84');
+        logWin(wx, wy, 7, 8);
         R(wx, wy, 7, 2, '#8fb0c8');
         R(wx - 1, wy + 8, 9, 1, '#cfc8bb');
       }
@@ -110,6 +115,7 @@
     const awn = AWNING[ci % AWNING.length];
     R(x + 3, base - 14, w - 6, 12, '#2c3a4c');
     R(x + 4, base - 13, w - 8, 8, '#a8c9d8');
+    logWin(x + 4, base - 13, w - 8, 8);
     R(x + 2, base - 19, w - 4, 5, awn);
     for (let sx = x + 2; sx < x + w - 2; sx += 6) R(sx, base - 19, 3, 5, '#f4f1ea');
     R(x + 4, base - 25, Math.min(w - 8, 30), 5, awn);
@@ -127,6 +133,7 @@
     R(x - 6, y - 32, 14, 2, '#3a3d45');
     R(x - 7, y - 30, 4, 2, '#f2d27a');
     R(x + 5, y - 30, 4, 2, '#f2d27a');
+    logLamp(x + 1, y - 31);
     R(x - 6, y - 31, 2, 1, '#fff2b8');
     R(x + 6, y - 31, 2, 1, '#fff2b8');
   }

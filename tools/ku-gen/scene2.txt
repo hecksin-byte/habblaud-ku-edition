@@ -47,9 +47,12 @@
     const by = Math.round(y + offY - (d.h - 12));
     sctx.translate(offX - bx, offY - by);
     const prev = c;
+    const prevOrigin = lightOrigin;
     c = sctx;
+    lightOrigin = { x: bx, y: by };
     draw();
     c = prev;
+    lightOrigin = prevOrigin;
     // recorta a caixa útil do desenho
     const px = sctx.getImageData(0, 0, d.w, d.h).data;
     let x0 = d.w;
@@ -566,5 +569,5 @@
     portals,
     pois,
   };
-  return { lo, sprites, map };
+  return { lo, sprites, map, lights: { windows: winLights, lamps: lampLights } };
 }

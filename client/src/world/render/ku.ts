@@ -50,11 +50,27 @@ export interface KuSprite {
   depth: number;
 }
 
+/** Uma janela (px de mundo): à noite, algumas ficam acesas. */
+export interface KuWindow {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** Fontes de luz da cena: as janelas dos edifícios e o bulbo dos postes (px de mundo). */
+export interface KuLights {
+  windows: KuWindow[];
+  lamps: { x: number; y: number }[];
+}
+
 export interface KuScene {
   lo: HTMLCanvasElement;
   sprites: KuSprite[];
   /** Onde se pode andar, portas, bancos e a faixa de pedestres (ver ku-map.ts). */
   map: KuMap;
+  /** Janelas e postes para a iluminação noturna (client/src/world/render/lighting.ts). */
+  lights: KuLights;
 }
 
 const cache = new Map<string, KuScene>();
@@ -87,6 +103,24 @@ function renderScene(g: KuGeometry): KuScene {
     c.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
   };
   const rnd = mulberry32(0x4b55);
+
+  // Luzes da noite: janelas e postes, em px de mundo. A posição vem da transformação atual do contexto (camadas com
+  // deslocamento) mais a origem do sprite quando se desenha num recorte.
+  const winLights: KuWindow[] = [];
+  const lampLights: { x: number; y: number }[] = [];
+  let lightOrigin = { x: 0, y: 0 };
+  const absArt = (x: number, y: number) => {
+    const t = c.getTransform();
+    return { x: x * t.a + t.e + lightOrigin.x, y: y * t.d + t.f + lightOrigin.y };
+  };
+  const logWin = (x: number, y: number, w: number, h: number) => {
+    const p = absArt(x, y);
+    winLights.push({ x: g.bx + p.x * S, y: g.by + p.y * S, w: w * S, h: h * S });
+  };
+  const logLamp = (x: number, y: number) => {
+    const p = absArt(x, y);
+    lampLights.push({ x: g.bx + p.x * S, y: g.by + p.y * S });
+  };
 
   // Geometria em pixels de arte: prédio, topo da calçada e centro da fileira de edifícios.
   const xL = (g.x0 - g.bx) / S;
@@ -153,10 +187,12 @@ function renderScene(g: KuGeometry): KuScene {
     for (let r = 0; r < half; r++) { const inset = half - 1 - r; R(x + inset - 1, y - 1 + r - half + 1, w - 2 * inset + 2, 1, '#d9d5c9'); }
     for (let r = 0; r < half; r++) { const inset = half - 1 - r; R(x + inset, y + r - half + 1, w - 2 * inset, 1, glass); }
     R(x, y, w, h, glass); R(Math.floor(x + w / 2), y - half + 3, 1, h + half - 3, '#d9d5c9'); R(x + 1, y + 2, 1, 3, 'rgba(255,255,255,.35)');
+    logWin(x, y - half + 2, w, h + half - 2);
   }
   function rect(x: number, y: number, w: number, h: number, glass = '#27384f') {
     R(x - 1, y - 1, w + 2, h + 2, '#d9d5c9'); R(x, y, w, h, glass);
     R(x + Math.floor(w / 2), y, 1, h, '#d9d5c9'); R(x, y + Math.floor(h / 2), w, 1, '#d9d5c9');
+    logWin(x, y, w, h);
   }
   function roof(x: number, y: number, w: number, h: number) {
     R(x - 2, y, w + 4, h, '#3d4656');
@@ -207,6 +243,7 @@ function renderScene(g: KuGeometry): KuScene {
   function lamp(x: number, y: number) {
     R(x, y - 26, 2, 26, '#2a2a32'); R(x - 3, y - 29, 8, 3, '#f2d27a'); R(x - 2, y - 30, 6, 1, '#fff2b8');
     R(x + 2, y - 24, 8, 16, CRIMSON); R(x + 2, y - 10, 8, 2, CRIM[2]); R(x + 4, y - 20, 4, 1, '#fff'); R(x + 4, y - 17, 4, 1, '#fff'); R(x + 4, y - 14, 3, 1, '#fff');
+    logLamp(x + 1, y - 29);
   }
   function bikeRack(x: number, y: number) { for (let i = 0; i < 4; i++) { R(x + i * 6, y, 1, 6, '#55585f'); R(x + i * 6 - 1, y + 5, 3, 1, '#55585f'); } R(x, y, 19, 1, '#55585f'); R(x + 2, y - 3, 4, 3, '#2d6cdf'); R(x + 12, y - 3, 4, 3, CRIMSON); }
   function bin(x: number, y: number) { R(x, y, 5, 7, '#3f6f4a'); R(x - 1, y - 1, 7, 2, '#2a4a32'); R(x + 1, y + 2, 3, 1, '#9bc7a6'); }
@@ -360,7 +397,10 @@ function renderScene(g: KuGeometry): KuScene {
       R(x + 4, wy, w - 8, 11, '#5e8ea6');
       R(x + 4, wy, w - 8, 3, '#a5cbdc');
       R(x + 4, wy + 8, w - 8, 3, '#4a7890');
-      for (let mx = x + 4; mx < x + w - 4; mx += 12) R(mx, wy, 1, 11, '#dfe3e6');
+      for (let mx = x + 4; mx < x + w - 4; mx += 12) {
+        R(mx, wy, 1, 11, '#dfe3e6');
+        if (mx + 12 <= x + w - 4) logWin(mx + 1, wy + 1, 10, 9);
+      }
       R(x, wy + 12, w, 2, '#9ea3a8');
     }
     R(x + 4, top - 3, w - 8, 3, '#dfe3e6');
@@ -373,6 +413,7 @@ function renderScene(g: KuGeometry): KuScene {
     for (let f = 0; f < floors; f++) {
       R(dx + 3, top + 4 + f * fh, dw - 8, 11, '#6fa3b9');
       R(dx + 3, top + 4 + f * fh, dw - 8, 3, '#b1d3e2');
+      logWin(dx + 3, top + 4 + f * fh, dw - 8, 11);
     }
     R(x + w / 2 - 12, base - 16, 24, 16, '#7fb0d0');
     R(x + w / 2 - 12, base - 16, 24, 3, '#bfdceb');
@@ -436,6 +477,7 @@ function renderScene(g: KuGeometry): KuScene {
       const wy = top + 6 + f * 13;
       for (let wx = x + 5; wx < x + w - 8; wx += 11) {
         R(wx, wy, 7, 8, '#4f6a84');
+        logWin(wx, wy, 7, 8);
         R(wx, wy, 7, 2, '#8fb0c8');
         R(wx - 1, wy + 8, 9, 1, '#cfc8bb');
       }
@@ -443,6 +485,7 @@ function renderScene(g: KuGeometry): KuScene {
     const awn = AWNING[ci % AWNING.length];
     R(x + 3, base - 14, w - 6, 12, '#2c3a4c');
     R(x + 4, base - 13, w - 8, 8, '#a8c9d8');
+    logWin(x + 4, base - 13, w - 8, 8);
     R(x + 2, base - 19, w - 4, 5, awn);
     for (let sx = x + 2; sx < x + w - 2; sx += 6) R(sx, base - 19, 3, 5, '#f4f1ea');
     R(x + 4, base - 25, Math.min(w - 8, 30), 5, awn);
@@ -460,6 +503,7 @@ function renderScene(g: KuGeometry): KuScene {
     R(x - 6, y - 32, 14, 2, '#3a3d45');
     R(x - 7, y - 30, 4, 2, '#f2d27a');
     R(x + 5, y - 30, 4, 2, '#f2d27a');
+    logLamp(x + 1, y - 31);
     R(x - 6, y - 31, 2, 1, '#fff2b8');
     R(x + 6, y - 31, 2, 1, '#fff2b8');
   }
@@ -607,9 +651,12 @@ function renderScene(g: KuGeometry): KuScene {
     const by = Math.round(y + offY - (d.h - 12));
     sctx.translate(offX - bx, offY - by);
     const prev = c;
+    const prevOrigin = lightOrigin;
     c = sctx;
+    lightOrigin = { x: bx, y: by };
     draw();
     c = prev;
+    lightOrigin = prevOrigin;
     // recorta a caixa útil do desenho
     const px = sctx.getImageData(0, 0, d.w, d.h).data;
     let x0 = d.w;
@@ -1126,5 +1173,5 @@ function renderScene(g: KuGeometry): KuScene {
     portals,
     pois,
   };
-  return { lo, sprites, map };
+  return { lo, sprites, map, lights: { windows: winLights, lamps: lampLights } };
 }

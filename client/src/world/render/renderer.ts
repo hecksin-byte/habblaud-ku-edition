@@ -20,7 +20,7 @@ import { RoomFxRenderer } from './github-fx';
 import { Lighting } from './lighting';
 import { Particles } from './particles';
 import { carSprite, propSprite, shadowSprite } from './props';
-import { KU_SCALE, paintKuCampus, type KuSprite } from './ku';
+import { KU_SCALE, paintKuCampus, type KuLights, type KuSprite } from './ku';
 import { KuPeople, busSprite, type VehicleInfo, type Walker } from './ku-people';
 import { KuTraffic, peoplePhase, type Car } from './ku-traffic';
 import { countBadge, fallbackIcon } from './shell-sprites';
@@ -92,6 +92,8 @@ export class Renderer {
   }
   /** Pessoas e objetos em pé do campus (ver ku.ts e ku-people.ts). */
   private kuSprites: KuSprite[] = [];
+  /** Janelas e postes do campus, para a luz da noite (lighting.ts lê pelo LightScene). */
+  kuLights: KuLights | null = null;
   private people: KuPeople | null = null;
   private ents: Ent[] = [];
   private pool: Ent[] = [];
@@ -203,6 +205,7 @@ export class Renderer {
       streetY1: (BUILDING_H + 9) * TILE,
     });
     this.kuSprites = ku.sprites;
+    this.kuLights = ku.lights;
     this.people = new KuPeople(ku.map, c.width);
     // faixas da rua
     const ly = this.exterior.streetY + Math.round(this.exterior.streetH / 2) - 1;

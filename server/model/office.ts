@@ -378,6 +378,16 @@ export class Office {
     this.markDirty();
   }
 
+  /** De qual sessão este agente principal foi bifurcado (undefined = de nenhuma). */
+  setForkOf(id: string, forkOf: AgentInfo['forkOf']): void {
+    const rec = this.agents.get(id);
+    if (!rec) return;
+    if (JSON.stringify(rec.info.forkOf ?? null) === JSON.stringify(forkOf ?? null)) return;
+    if (forkOf) rec.info.forkOf = JSON.parse(JSON.stringify(forkOf)) as NonNullable<AgentInfo['forkOf']>;
+    else delete rec.info.forkOf;
+    this.markDirty();
+  }
+
   setStatus(id: string, status: AgentStatus, waitingFor?: string): void {
     const rec = this.agents.get(id);
     if (!rec) return;

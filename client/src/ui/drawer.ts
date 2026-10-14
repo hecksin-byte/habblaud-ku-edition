@@ -23,6 +23,7 @@ import {
 } from './format';
 import { ARCHIVE_ICON, ICONS } from './icons';
 import { canArchive } from '../net/hidden';
+import { forkInfo, shortSessionId } from './lineage';
 import {
   accountsOf,
   activityFallback,
@@ -209,6 +210,11 @@ class AgentView {
   /** Dica dos hooks do Codex (ao vivo e aprovar pelo escritório), na gaveta de um agente do Codex. */
   private codexHint: HTMLElement;
   private roomBtn: HTMLButtonElement;
+  /** Linha "Sessão": id da sessão e, se for fork, de qual (com atalho para a origem quando ela está no escritório). */
+  private sessionRow: HTMLElement;
+  private sessionId: HTMLElement;
+  private forkBtn: HTMLButtonElement;
+  private forkNote: HTMLElement;
   private roomName: HTMLElement;
   private gone: HTMLElement;
   private dot: HTMLElement;
@@ -282,6 +288,21 @@ class AgentView {
     this.accProv = createProviderTag('ui-prov--xs');
     this.accEmail = h('span', { class: 'ui-hero__acc-email' });
     this.roomName = h('span');
+    this.sessionId = h('code', { class: 'ui-session-id' });
+    this.forkBtn = h('button', {
+      class: 'ui-room-link',
+      type: 'button',
+      hidden: true,
+      on: {
+        click: () => {
+          const a = this.agentId ? ctx.agent(this.agentId) : undefined;
+          const info = a ? forkInfo(a, ctx.store.snapshot?.agents ?? []) : null;
+          if (info?.parent) ctx.select({ type: 'agent', id: info.parent.id }, { focus: true });
+        },
+      },
+    }) as HTMLButtonElement;
+    this.forkNote = h('span', { class: 'ui-muted' });
+    this.sessionRow = h('div', { class: 'ui-hero__where', hidden: true }, h('span', { class: 'ui-muted', text: tr('Sessão') }), this.sessionId, this.forkBtn, this.forkNote);
     this.roomBtn = h('button', { class: 'ui-room-link', type: 'button', on: { click: () => this.last && ctx.select({ type: 'room', id: this.last.roomId }, { focus: true }) } }, this.roomName);
     this.character = new CharacterEditor(ctx);
     const heroText = h(
@@ -290,6 +311,7 @@ class AgentView {
       h('div', { class: 'ui-hero__line' }, this.name, this.character.button, this.role),
       h('div', { class: 'ui-hero__acc' }, this.accChip, this.accName, this.accProv, this.accEmail),
       h('div', { class: 'ui-hero__where' }, h('span', { class: 'ui-muted', text: tr('Sala') }), this.roomBtn),
+      this.sessionRow,
     );
     this.gone = h('p', { class: 'ui-gone', text: tr('Este agente já saiu do escritório.'), hidden: true });
 
@@ -567,6 +589,18 @@ class AgentView {
     setHidden(this.accEmail, !accSub);
     setText(this.roomName, room?.name ?? a.roomId);
     setTitle(this.roomBtn, room ? tr('{0}\nClique para ver a sala', [room.path]) : '');
+    // Sessão: id curto e, se for fork, de qual sessão saiu (e quantos saíram dela).
+    const lineage = forkInfo(a, this.ctx.store.snapshot?.agents ?? []);
+    setHidden(this.sessionRow, a.kind !== 'main');
+    setText(this.sessionId, shortSessionId(a));
+    setTitle(this.sessionId, a.sessionId);
+    const goParent = !!lineage?.parent;
+    setHidden(this.forkBtn, !goParent);
+    setHidden(this.forkNote, goParent || !lineage);
+    setText(this.forkBtn, goParent ? (lineage?.text ?? '') : '');
+    setText(this.forkNote, goParent ? '' : (lineage?.text ?? ''));
+    setTitle(this.forkBtn, lineage?.title ?? '');
+    setTitle(this.forkNote, lineage?.title ?? '');
     setHidden(this.gone, !!live);
     this.el.classList.toggle('is-gone', !live);
 

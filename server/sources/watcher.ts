@@ -30,6 +30,7 @@ import {
   type SubagentMeta,
 } from './subagents';
 import { FileTail } from './tail';
+import { SessionLineage } from './lineage';
 import {
   createTranscriptState,
   mergePrefix,
@@ -100,6 +101,9 @@ interface SubTracker {
 }
 
 interface SessionTracker {
+  /** Checagem de "de qual sessão este é fork" (lineage.ts): tentativas feitas e quando tentar de novo. */
+  lineageTries?: number;
+  lineageNextAt?: number;
   key: string;
   accountId: string;
   dir: string;
@@ -168,6 +172,7 @@ export class ClaudeWatcher implements AgentSource {
   readonly provider = 'claude' as const;
   private readers = new Map<string, RegistryReader>();
   private sessions = new Map<string, SessionTracker>();
+  private readonly lineage = new SessionLineage();
   private sourceInfo = new Map<string, SourceInfo>();
   private dirWatchers = new Map<string, FSWatcher>();
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -329,6 +334,7 @@ export class ClaudeWatcher implements AgentSource {
     }
     t.entry = entry;
     this.pumpMain(t);
+    this.checkLineage(t);
     this.scanSubagents(t, boot);
     this.pumpSubs(t);
     const now = this.now();
@@ -443,6 +449,26 @@ export class ClaudeWatcher implements AgentSource {
       // projects/ ainda não existe
     }
     return undefined;
+  }
+
+  /**
+   * Descobre se a sessão é um fork de outra (mesmo começo de histórico). Tenta ao abrir o transcript e mais uma vez 20 s
+   * depois, caso a cópia do histórico ainda estivesse sendo gravada; achou, não repete.
+   */
+  private checkLineage(t: SessionTracker): void {
+    if (!t.transcriptPath || (t.lineageTries ?? 0) >= 2) return;
+    const now = this.now();
+    if (now < (t.lineageNextAt ?? 0)) return;
+    t.lineageTries = (t.lineageTries ?? 0) + 1;
+    t.lineageNextAt = now + 20_000;
+    let found: ReturnType<SessionLineage['forkOf']>;
+    try {
+      found = this.lineage.forkOf(t.transcriptPath);
+    } catch {
+      found = undefined;
+    }
+    this.opts.office.setForkOf(t.key, found);
+    if (found) t.lineageTries = 2;
   }
 
   private pumpMain(t: SessionTracker): void {

@@ -797,3 +797,20 @@ describe('Office: personagem do projeto', () => {
     expect(names.character('/p/api')?.owner).toBe('s2b');
   });
 });
+
+describe('Office.setForkOf', () => {
+  it('guarda de qual sessão o agente foi bifurcado, só mexe no escritório quando muda, e limpa', () => {
+    const { office } = makeOffice();
+    office.addMain({ id: 'acc:1', account: 'acc', sessionId: 's1', cwd: '/p/a', role: 'Agente principal', startedAt: 0, status: 'idle' });
+    const fork = () => office.commit().snapshot.agents.find((a) => a.id === 'acc:1')!.forkOf;
+    expect(fork()).toBeUndefined();
+    office.setForkOf('acc:1', { sessionId: 'orig', title: 'Plano' });
+    expect(fork()).toEqual({ sessionId: 'orig', title: 'Plano' });
+    const rev = office.commit().snapshot.rev;
+    office.setForkOf('acc:1', { sessionId: 'orig', title: 'Plano' }); // igual: nada muda
+    expect(office.commit().snapshot.rev).toBe(rev);
+    office.setForkOf('acc:1', undefined);
+    expect(fork()).toBeUndefined();
+    office.setForkOf('nao-existe', { sessionId: 'x' }); // não quebra
+  });
+});

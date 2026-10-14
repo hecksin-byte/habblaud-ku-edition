@@ -9144,3 +9144,23 @@ html.is-replay #world {
   outline: 2px solid #4aa8e8;
   outline-offset: 1px;
 }
+
+/* De qual sessão o agente saiu (fork) e quantos forks saíram dele. */
+.ui-agent__fork {
+  display: block;
+  margin-top: 1px;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--ui-accent, #8fb8e8);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-session-id {
+  font: 600 11px/1 var(--font-mono);
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.07);
+  user-select: all;
+}

@@ -176,6 +176,11 @@ export interface AgentInfo {
   /** Subagente rodando em segundo plano. */
   background?: boolean;
   /**
+   * Sessão da qual esta foi bifurcada (fork: começou com a cópia do histórico dela). Só em agentes principais; descoberto
+   * comparando o começo dos transcripts (server/sources/lineage.ts). `title` é o título do pai; `ancestors`, os de cima dele.
+   */
+  forkOf?: { sessionId: string; title?: string; ancestors?: { sessionId: string; title?: string }[] };
+  /**
    * Pedido de permissão que dá para responder pelo Habblaud (hook PermissionRequest; o mais antigo, se
    * houver vários). Enquanto existe, o agente aparece como 'waiting'. Ver PermissionRequestInfo.
    */
