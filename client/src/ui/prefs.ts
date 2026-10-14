@@ -28,6 +28,8 @@ export interface UiPrefs {
   hideIdleDays: IdleHideDays;
   /** Agentes arquivados pelo botão do agente (só somem da tela; dá para trazer de volta nas configurações). */
   archived: ArchivedEntry[];
+  /** Nomes escolhidos para as contas (AccountInfo.id -> nome), mostrados no lugar de "Conta A" etc. */
+  accountNames: Record<string, string>;
 }
 
 export const DEFAULT_PREFS: UiPrefs = {
@@ -44,7 +46,22 @@ export const DEFAULT_PREFS: UiPrefs = {
   hiddenAccounts: [],
   hideIdleDays: 0,
   archived: [],
+  accountNames: {},
 };
+
+export const ACCOUNT_NAME_MAX = 24;
+
+function sanitizeAccountNames(raw: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+  for (const [id, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!id || id.length > 120 || typeof v !== 'string') continue;
+    const name = [...v.replace(/\s+/g, ' ').trim()].slice(0, ACCOUNT_NAME_MAX).join('');
+    if (name) out[id] = name;
+    if (Object.keys(out).length >= 20) break;
+  }
+  return out;
+}
 
 const MAX_ARCHIVED = 300;
 
@@ -72,7 +89,7 @@ function sanitizeIdleDays(raw: unknown): IdleHideDays {
 
 /** O filtro do escritório (net/hidden.ts) a partir das preferências. */
 export function hideFilterFrom(p: UiPrefs): HideFilter {
-  return { archived: new Set(p.archived.map((e) => e.key)), idleDays: p.hideIdleDays };
+  return { archived: new Set(p.archived.map((e) => e.key)), idleDays: p.hideIdleDays, accountNames: p.accountNames };
 }
 
 type StorageLike = Pick<Storage, 'getItem' | 'setItem'>;
@@ -100,6 +117,7 @@ export function sanitizePrefs(raw: unknown): UiPrefs {
     hiddenAccounts: Array.isArray(o.hiddenAccounts) ? o.hiddenAccounts.filter((x): x is string => typeof x === 'string').slice(0, 20) : [],
     hideIdleDays: sanitizeIdleDays(o.hideIdleDays),
     archived: sanitizeArchived(o.archived),
+    accountNames: sanitizeAccountNames(o.accountNames),
   };
 }
 

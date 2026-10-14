@@ -1,6 +1,7 @@
 // Configurações (popover): opções do escritório, avisos, modo demonstração e Sobre (versão).
 import { access, remoteLogout } from '../net/access';
 import type { IdleHideDays } from '../net/hidden';
+import { ACCOUNT_NAME_MAX } from './prefs';
 import type { UiComponent, UiContext } from './context';
 import { h, iconButton, setAttr, setHidden, setText } from './dom';
 import { ICONS } from './icons';
@@ -97,6 +98,9 @@ export class SettingsPopover implements UiComponent {
   private archivedList: HTMLElement;
   private archivedKey = '';
   private restoreAll: HTMLButtonElement;
+  /** Nomes das contas: um campo por conta (o nome original aparece como dica); vazio = volta ao nome do servidor. */
+  private accountRows: HTMLElement;
+  private accountKey = '';
   /** Só no Windows e pelo próprio computador: ligar/desligar a tarefa agendada que sobe o servidor (GET/POST /api/autostart). */
   private autostartGroup: HTMLElement;
   private autostartSw: SwitchRefs;
@@ -183,6 +187,13 @@ export class SettingsPopover implements UiComponent {
     this.hideSummary = h('span', { class: 'ui-set__hint' });
     this.archivedList = h('ul', { class: 'ui-archived' });
     this.restoreAll = h('button', { class: 'ui-btn', type: 'button', text: tr('Trazer todos de volta'), on: { click: () => ctx.restoreArchived() } }) as HTMLButtonElement;
+    this.accountRows = h('div', { class: 'ui-acct-names' });
+    const accountGroup = h(
+      'div',
+      { class: 'ui-set-group' },
+      h('h3', { text: tr('Nomes das contas') }),
+      h('div', { class: 'ui-set ui-set--stack' }, h('span', { class: 'ui-set__hint', text: tr('Dê o nome que quiser a cada conta. Só muda na tela (barra de uso, lista, avisos e dicas); deixar vazio volta ao nome original.') }), this.accountRows),
+    );
     const hideGroup = h(
       'div',
       { class: 'ui-set-group' },
@@ -249,6 +260,7 @@ export class SettingsPopover implements UiComponent {
       ),
       this.soundGroup.el,
       h('div', { class: 'ui-set-group' }, h('h3', { text: tr('Idioma') }), this.language.row),
+      accountGroup,
       hideGroup,
       this.demoGroup,
       this.autostartGroup,
@@ -321,6 +333,7 @@ export class SettingsPopover implements UiComponent {
       setAttr(r.btn, 'aria-checked', String(on));
       r.btn.disabled = key === 'demo' && this.demoBusy;
     }
+    this.renderAccountNames();
     this.renderHidden();
     this.bubbles.set(p.bubbles);
     this.liveliness.set(p.liveliness);
@@ -352,6 +365,42 @@ export class SettingsPopover implements UiComponent {
     const state = await this.notifier.enableBrowserNotifications();
     this.ctx.updatePrefs({ browserNotifications: state === 'granted' });
     if (state === 'denied') this.ctx.announce(tr('Notificações bloqueadas pelo navegador.'));
+  }
+
+  /** Um campo de nome por conta. Só refaz as linhas quando as contas ou os nomes escolhidos mudam (não enquanto se digita). */
+  private renderAccountNames(): void {
+    const accounts = this.ctx.store.rawAccounts;
+    const names = this.ctx.prefs.accountNames;
+    const key = accounts.map((a) => `${a.id}=${names[a.id] ?? ''}`).join('\n');
+    if (key === this.accountKey) return;
+    this.accountKey = key;
+    this.accountRows.replaceChildren(
+      ...accounts.map((a) => {
+        const input = h('input', {
+          class: 'ui-acct-names__input',
+          type: 'text',
+          attrs: { maxlength: String(ACCOUNT_NAME_MAX), placeholder: a.name, 'aria-label': tr('Nome da conta {0}', [a.name]), autocomplete: 'off', spellcheck: 'false' },
+        }) as HTMLInputElement;
+        input.value = names[a.id] ?? '';
+        const commit = () => {
+          const next = { ...this.ctx.prefs.accountNames };
+          const v = input.value.trim();
+          if (v) next[a.id] = v;
+          else delete next[a.id];
+          if ((next[a.id] ?? '') !== (this.ctx.prefs.accountNames[a.id] ?? '')) this.ctx.updatePrefs({ accountNames: next });
+        };
+        input.addEventListener('change', commit);
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            input.blur();
+          }
+        });
+        const chip = h('span', { class: 'ui-acc-chip', text: a.short, title: a.email ?? a.id });
+        chip.style.setProperty('--acc', a.color);
+        return h('label', { class: 'ui-acct-names__row' }, chip, h('span', { class: 'ui-acct-names__who', text: a.email ?? a.id }), input);
+      }),
+    );
   }
 
   /** "Ocultar parados há N dias" e a lista de arquivados, com o botão de trazer de volta. */

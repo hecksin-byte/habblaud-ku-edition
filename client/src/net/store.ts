@@ -407,6 +407,11 @@ export class OfficeStore {
     } else this.setSnapshot(snap);
   }
 
+  /** As contas como o servidor as mandou (com o nome dele), para mostrar o nome original ao renomear. */
+  get rawAccounts(): OfficeSnapshot['accounts'] {
+    return this.raw?.accounts ?? [];
+  }
+
   /** Os agentes principais do último snapshot do servidor, escondidos ou não (para a lista de arquivados). */
   get rawAgents(): readonly AgentInfo[] {
     return this.raw?.agents ?? [];

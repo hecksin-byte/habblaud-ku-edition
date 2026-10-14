@@ -101,3 +101,31 @@ describe('agentes fora da tela', () => {
     expect(canArchive(agent('a', { status: 'idle', parentId: 'p' }))).toBe(false);
   });
 });
+
+describe('nomes de contas escolhidos pelo usuário', () => {
+  const withAccounts = (s: OfficeSnapshot): OfficeSnapshot =>
+    ({ ...s, accounts: [{ id: '.claude', name: 'Conta A', short: 'A', color: '#f80', email: 'a@x.com' }, { id: 'codex', name: 'Codex', short: 'X', color: '#00f' }] }) as unknown as OfficeSnapshot;
+
+  it('troca só o nome da conta renomeada; o resto do snapshot é o mesmo', () => {
+    const s = withAccounts(snap([agent('a')]));
+    const r = filterSnapshot(s, { archived: new Set(), idleDays: 0, accountNames: { '.claude': '  Pesquisa  ' } });
+    expect(r.snap.accounts.map((a) => a.name)).toEqual(['Pesquisa', 'Codex']);
+    expect(r.snap.accounts[0].email).toBe('a@x.com'); // o resto da conta não muda
+    expect(r.snap.agents).toBe(s.agents);
+    expect(s.accounts[0].name).toBe('Conta A'); // o original não é alterado
+  });
+
+  it('sem nomes (ou só vazios) devolve o mesmo snapshot', () => {
+    const s = withAccounts(snap([agent('a')]));
+    expect(filterSnapshot(s, { archived: new Set(), idleDays: 0 }).snap).toBe(s);
+    expect(filterSnapshot(s, { archived: new Set(), idleDays: 0, accountNames: { '.claude': '   ', outra: 'x' } }).snap).toBe(s);
+  });
+
+  it('funciona junto com agentes escondidos', () => {
+    const a = agent('a');
+    const s = withAccounts(snap([a, agent('b', { roomId: 'r2' })], [room('r1'), room('r2')]));
+    const r = filterSnapshot(s, { archived: new Set([sessionKey(a)]), idleDays: 0, accountNames: { codex: 'Codex do Lab' } });
+    expect(r.snap.agents.map((x) => x.id)).toEqual(['b']);
+    expect(r.snap.accounts.map((x) => x.name)).toEqual(['Conta A', 'Codex do Lab']);
+  });
+});

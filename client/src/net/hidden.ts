@@ -20,9 +20,26 @@ export interface ArchivedEntry {
 export interface HideFilter {
   archived: ReadonlySet<string>;
   idleDays: number;
+  /** Nomes que o usuário deu às contas (AccountInfo.id -> nome): só a tela muda, o servidor segue mandando o nome dele. */
+  accountNames?: Readonly<Record<string, string>>;
 }
 
 export const NO_HIDE: HideFilter = { archived: new Set(), idleDays: 0 };
+
+/** Nome de uma conta que o usuário escolheu (sem espaços sobrando), ou undefined. */
+export function customAccountName(names: HideFilter['accountNames'], id: string): string | undefined {
+  const n = names?.[id]?.trim();
+  return n ? n : undefined;
+}
+
+/** Aplica os nomes escolhidos às contas; devolve o mesmo array se nenhuma foi renomeada. */
+function renameAccounts(accounts: OfficeSnapshot['accounts'], names: HideFilter['accountNames']): OfficeSnapshot['accounts'] {
+  if (!names || !accounts.some((a) => customAccountName(names, a.id))) return accounts;
+  return accounts.map((a) => {
+    const n = customAccountName(names, a.id);
+    return n ? { ...a, name: n } : a;
+  });
+}
 
 /** Chave estável da sessão: o id do agente principal muda quando o processo reinicia, a sessão não. */
 export function sessionKey(a: Pick<AgentInfo, 'account' | 'sessionId'>): string {
@@ -68,11 +85,12 @@ export function filterSnapshot(snap: OfficeSnapshot, f: HideFilter): FilterResul
       idle++;
     }
   }
-  if (!hiddenMain.size) return { snap, archived: 0, idle: 0 };
+  const accounts = renameAccounts(snap.accounts, f.accountNames);
+  if (!hiddenMain.size) return { snap: accounts === snap.accounts ? snap : { ...snap, accounts }, archived: 0, idle: 0 };
   const agents = snap.agents.filter((a) => !hiddenMain.has(a.id) && !(a.parentId && hiddenMain.has(a.parentId)));
   const roomsWithAgents = new Set(agents.map((a) => a.roomId));
   const hiddenRooms = new Set(snap.agents.filter((a) => !agents.includes(a)).map((a) => a.roomId));
   // Só some a sala que ficou vazia por causa do que foi escondido (uma sala sem ninguém desde o início continua como estava).
   const rooms = snap.rooms.filter((r) => roomsWithAgents.has(r.id) || !hiddenRooms.has(r.id));
-  return { snap: { ...snap, agents, rooms }, archived, idle };
+  return { snap: { ...snap, agents, rooms, accounts }, archived, idle };
 }

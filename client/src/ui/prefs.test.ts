@@ -145,3 +145,19 @@ describe('arquivados e parados há dias', () => {
     expect(f.archived.has('a|b')).toBe(true);
   });
 });
+
+describe('nomes das contas', () => {
+  it('sanitizePrefs aceita nomes curtos e descarta o resto', () => {
+    const long = 'x'.repeat(40);
+    const p = sanitizePrefs({ accountNames: { '.claude': '  Pesquisa   do  Lab ', vazio: '   ', numero: 5, '': 'sem id', longo: long } });
+    expect(p.accountNames['.claude']).toBe('Pesquisa do Lab');
+    expect(p.accountNames.longo).toHaveLength(24);
+    expect(Object.keys(p.accountNames).sort()).toEqual(['.claude', 'longo']);
+    expect(sanitizePrefs({ accountNames: 'oi' }).accountNames).toEqual({});
+    expect(sanitizePrefs({}).accountNames).toEqual({});
+  });
+
+  it('hideFilterFrom leva os nomes junto', () => {
+    expect(hideFilterFrom({ ...DEFAULT_PREFS, accountNames: { a: 'B' } }).accountNames).toEqual({ a: 'B' });
+  });
+});
