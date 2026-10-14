@@ -6,6 +6,11 @@ Habblaud는 Claude Code(와 Codex) 에이전트를 픽셀 아트 사무실로 �
 이 저장소에는 KU Edition의 설치 방법과 원본에서 바뀐 점만 적습니다.
 
 기준 버전은 원본 0.11.0(커밋 `4ccce25`)이고, 라이선스는 원본과 같은 MIT입니다(`LICENSE`).
+원작자(Márcio Junior)의 저작권 고지와 MIT 라이선스 전문은 `LICENSE`에 그대로 있습니다.
+
+> **비공식 개인 프로젝트입니다.** 고려대학교, Anthropic, 서울교통공사와 관련이 없고 승인이나 후원을 받은 것도 아닙니다.
+> 학교 이름·호랑이 상징·건물 모습·지하철 표시는 직접 그린 픽셀 아트로 표현한 팬 작품이며, 사진이나 공식 로고·교표 파일은 쓰지 않았습니다.
+> 관계자의 요청이 있으면 해당 부분을 바로 삭제하거나 고칩니다. "Claude Code"는 Anthropic의 제품 이름이고, "Habblaud"는 원본 프로젝트의 이름입니다.
 
 ![KU Edition 전체 화면](docs/ku-edition/app-overview.png)
 
