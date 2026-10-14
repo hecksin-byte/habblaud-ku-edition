@@ -8,6 +8,7 @@ import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { tr } from '../../shared/i18n';
+import { restrictToOwner } from '../fs-private';
 
 export const ATTACHMENT_MAX_BYTES = 15 * 1024 * 1024;
 export const ATTACHMENTS_PER_SPAWN = 8;
@@ -121,6 +122,7 @@ export function writeAttachments(root: string, spawnId: string, files: readonly 
   const dir = join(root, `${stamp(at)}-${spawnId.replace(/[^\w-]/g, '').slice(0, 8) || 'pedido'}`);
   mkdirSync(dir, { recursive: true, mode: 0o700 });
   chmodSync(dir, 0o700);
+  restrictToOwner(dir, 0o700);
   const used = new Set<string>();
   return files.map((f) => {
     let name = safeFileName(f.name);
@@ -134,6 +136,7 @@ export function writeAttachments(root: string, spawnId: string, files: readonly 
     used.add(name.toLowerCase());
     const path = join(dir, name);
     writeFileSync(path, f.data, { mode: 0o600, flag: 'wx' });
+    restrictToOwner(path, 0o600);
     return path;
   });
 }

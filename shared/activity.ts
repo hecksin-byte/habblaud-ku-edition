@@ -776,10 +776,10 @@ export function describePrompt(text: string): ActivityDescription {
 
 export function formatDuration(ms: number): string {
   const s = Math.round(ms / 1000);
-  if (s < 60) return `${s}s`;
+  if (s < 60) return tr('{0}s', [s]);
   const m = Math.floor(s / 60);
-  if (m < 60) return `${m}min${s % 60 ? ` ${s % 60}s` : ''}`;
-  return `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}min` : ''}`;
+  if (m < 60) return s % 60 ? tr('{0}min {1}s', [m, s % 60]) : tr('{0}min', [m]);
+  return m % 60 ? tr('{0}h {1}min', [Math.floor(m / 60), m % 60]) : tr('{0}h', [Math.floor(m / 60)]);
 }
 
 // ------------------------------------------------------------------ shells (espera por comandos)

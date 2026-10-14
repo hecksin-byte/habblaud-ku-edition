@@ -12,6 +12,8 @@ export interface InputHandlers {
   interact(): void;
   overview(): void;
   zoomStep(steps: number, sx?: number, sy?: number): void;
+  /** Tecla "−": mostra o mundo inteiro de uma vez (opcional; sem ele, desce um nível de zoom). */
+  zoomOutAll?(): void;
 }
 
 const DRAG_THRESHOLD = 5;
@@ -196,7 +198,8 @@ export function attachInput(canvas: HTMLCanvasElement, camera: Camera, h: InputH
         return;
       case '-':
       case '_':
-        h.zoomStep(-1);
+        if (h.zoomOutAll) h.zoomOutAll();
+        else h.zoomStep(-1);
         e.preventDefault();
         return;
       case '0':

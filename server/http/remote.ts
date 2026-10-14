@@ -26,6 +26,7 @@ import net from 'node:net';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { parsePasswordHash, verifyPassword, type PasswordHash } from '../remote/password';
+import { restrictToOwner } from '../fs-private';
 import { hostAllowed } from './guard';
 import { getLocale, tr } from '../../shared/i18n';
 
@@ -115,6 +116,7 @@ export function loadSecret(file: string): Buffer {
     mkdirSync(dirname(file), { recursive: true });
     writeFileSync(file, secret.toString('hex'), { mode: 0o600 });
     chmodSync(file, 0o600);
+    restrictToOwner(file, 0o600);
     return secret;
   } catch {
     return randomBytes(32);
@@ -198,6 +200,7 @@ export class RemoteSessions {
       mkdirSync(dirname(this.revokedFile), { recursive: true });
       const tmp = `${this.revokedFile}.tmp`;
       writeFileSync(tmp, JSON.stringify(Object.fromEntries(this.revoked)), { mode: 0o600 });
+      restrictToOwner(tmp, 0o600);
       renameSync(tmp, this.revokedFile);
     } catch {
       // segue valendo em memória até o próximo reinício

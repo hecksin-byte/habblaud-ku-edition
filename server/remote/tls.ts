@@ -20,6 +20,7 @@ import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, renameSyn
 import { hostname, networkInterfaces, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { tr } from '../../shared/i18n';
+import { restrictToOwner } from '../fs-private';
 
 export const CA_DAYS = 3650;
 export const SERVER_DAYS = 397;
@@ -155,6 +156,7 @@ function openssl(run: Run, args: string[]): void {
 function ensureDir(dir: string, mode: number): void {
   mkdirSync(dir, { recursive: true, mode });
   chmodSync(dir, mode);
+  restrictToOwner(dir, mode);
 }
 
 function constraintsFile(paths: TlsPaths): string {
@@ -224,7 +226,9 @@ export function ensureCa(paths: TlsPaths, label: string, run: Run = spawnSync, d
     const crt = join(work, 'ca.crt');
     openssl(run, ['req', '-x509', '-new', '-newkey', 'rsa:2048', '-nodes', '-sha256', '-days', String(CA_DAYS), '-keyout', key, '-out', crt, '-config', cnf]);
     chmodSync(key, 0o600);
+    restrictToOwner(key, 0o600);
     writeFileSync(constraintsFile(paths), `${JSON.stringify({ dns })}\n`, { mode: 0o600 });
+    restrictToOwner(constraintsFile(paths), 0o600);
     renameSync(key, paths.caKey);
     renameSync(crt, paths.caCert);
     return true;

@@ -22,10 +22,10 @@ export const DOOR_X = 7;
 export const DOOR_W = 2;
 
 /** Margens de área externa ao redor do prédio (tiles). */
-export const EXT_WEST = 20;
-export const EXT_EAST = 20;
-export const EXT_NORTH = 16;
-export const EXT_SOUTH = 24;
+export const EXT_WEST = 40;
+export const EXT_EAST = 40;
+export const EXT_NORTH = 44;
+export const EXT_SOUTH = 22;
 
 /** Velocidades em px de mundo por segundo. */
 export const WALK_SPEED = 3.2 * TILE;

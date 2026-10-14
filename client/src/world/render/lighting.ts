@@ -36,7 +36,7 @@ export interface LightScene {
   readonly exterior: ExteriorLayout;
   readonly shells: readonly SlotShell[];
   readonly shellWindows: readonly WallVis[];
-  readonly cars: readonly { x: number; y: number; dir: 1 | -1 }[];
+  readonly cars: readonly { x: number; y: number; dir: 1 | -1; half?: number }[];
   roomInSlot(slot: number): RoomState | undefined;
   deskScreen(f: FurnVis, area: AreaVis): ScreenMode;
 }
@@ -575,11 +575,12 @@ export class Lighting {
     const tail = glowSprite('#ff4a3a', 16);
     for (const car of scene.cars) {
       if (car.x < view.x0 - 80 || car.x > view.x1 + 80 || car.y < view.y0 - 30 || car.y > view.y1 + 30) continue;
-      const front = car.x + car.dir * 16;
+      const half = car.half ?? 16;
+      const front = car.x + car.dir * half;
       ctx.globalAlpha = 0.55 * n;
       ctx.drawImage(beam, Math.round(front + (car.dir > 0 ? 0 : -46)), Math.round(car.y - 15), 46, 16);
       ctx.globalAlpha = 0.8 * n;
-      ctx.drawImage(tail, Math.round(car.x - car.dir * 16 - 4), Math.round(car.y - 11), 8, 8);
+      ctx.drawImage(tail, Math.round(car.x - car.dir * half - 4), Math.round(car.y - 11), 8, 8);
     }
   }
 

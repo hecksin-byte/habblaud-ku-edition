@@ -7,7 +7,7 @@ import { DEFAULT_WORLD_OPTIONS, seasonalThemeFor, type Selection, type SocialEve
 import { loadWorldAssets, type WorldAssets } from './assets';
 import { Camera, overviewFrame } from './camera';
 import { createDebug, type WorldDebug } from './debug';
-import { BUILDING_H, COL_W } from './constants';
+import { BUILDING_H, COL_W, EXT_EAST, EXT_NORTH, EXT_SOUTH, EXT_WEST } from './constants';
 import { inRect } from './layout/geometry';
 import { attachInput, type Hit } from './input';
 import { rebaseSnapshot } from './playback';
@@ -67,11 +67,21 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore): Worl
 
   const buildingRect = () => ({ x: 0, y: 0, w: sim.building.cols * COL_W * TILE, h: BUILDING_H * TILE });
 
+  /** Menor zoom permitido: o mundo cobre toda a área livre (sem margens vazias nas laterais). */
+  const worldCoverZoom = () => {
+    const b = camera.bounds;
+    const ins = camera.insets;
+    const w = Math.max(80, camera.viewW - ins.left - ins.right);
+    const h = Math.max(80, camera.viewH - ins.top - ins.bottom);
+    return Math.min(1, Math.max(0.25, Math.max(w / b.w, h / b.h)));
+  };
+
   const updateBounds = () => {
     const b = buildingRect();
-    camera.bounds = { x: b.x - 7 * TILE, y: b.y - 6 * TILE, w: b.w + 14 * TILE, h: b.h + 18 * TILE };
-    const fit = camera.fitZoom(b, 16);
-    camera.minZoom = Math.min(1, Math.max(0.25, fit));
+    // o campus em volta do prédio (norte, lados e sul) também pode ser visto: os limites são o mundo inteiro
+    const world = { x: -EXT_WEST * TILE, y: -EXT_NORTH * TILE, w: b.w + (EXT_WEST + EXT_EAST) * TILE, h: (EXT_NORTH + BUILDING_H + EXT_SOUTH) * TILE };
+    camera.bounds = world;
+    camera.minZoom = worldCoverZoom();
     camera.clamp();
   };
 
@@ -121,7 +131,8 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore): Worl
     const ch = sim.chars.get(id);
     if (!ch) return;
     userMoved = true;
-    const zoom = Math.max(camera.zoom, camera.snapZoom(3));
+    // já bem aproximado: mantém o zoom; de longe (visão geral do campus), aproxima só até 2x
+    const zoom = camera.zoom >= 1.5 ? camera.zoom : Math.max(camera.zoom, camera.snapZoom(2));
     const c = camera.centerFor(ch.x, ch.y - 12, zoom);
     camera.animateTo(c.x, c.y, zoom, Date.now(), 420);
     camera.follow = opts.follow ? id : null;
@@ -138,6 +149,19 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore): Worl
     const zoom = Math.min(4, Math.max(camera.minZoom, camera.snapZoom(fit, 'down')));
     const c = camera.centerFor(rect.x + rect.w / 2, rect.y + rect.h / 2, zoom);
     camera.animateTo(c.x, c.y, zoom, Date.now(), 420);
+  };
+
+  /** Enquadra o mundo inteiro (campus todo) de uma vez, sem passar pelos níveis de zoom intermediários. */
+  const showWorld = () => {
+    userMoved = true;
+    camera.follow = null;
+    const b = camera.bounds;
+    camera.minZoom = worldCoverZoom();
+    const z = camera.minZoom;
+    const c = camera.centerFor(b.x + b.w / 2, b.y + b.h / 2, z);
+    // largura toda visível; a vertical começa pelo topo do mundo (os edifícios do campus)
+    const top = (-camera.viewH / 2 + camera.insets.top) / z;
+    camera.animateTo(c.x, b.y - top, z, Date.now(), 420);
   };
 
   const zoomStep = (steps: number, sx = camera.viewW / 2, sy = camera.viewH / 2) => {
@@ -194,6 +218,7 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore): Worl
     },
     overview: () => overview(true),
     zoomStep,
+    zoomOutAll: showWorld,
   });
 
   // ------------------------------------------------------------------ dados
@@ -353,6 +378,11 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore): Worl
     },
     zoomBy: (factor) => {
       if (!Number.isFinite(factor) || factor <= 0 || factor === 1) return;
+      // um toque em "−" já mostra o campus inteiro
+      if (factor < 1) {
+        showWorld();
+        return;
+      }
       const target = camera.snapZoom(camera.zoom * factor, factor > 1 ? 'up' : 'down');
       if (Math.abs(target - camera.zoom) < 1e-3) zoomStep(factor > 1 ? 1 : -1);
       else {

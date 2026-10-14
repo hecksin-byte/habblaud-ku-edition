@@ -47,31 +47,7 @@ export function layoutExterior(cols: number): ExteriorLayout {
   floors.push({ kind: 'sidewalk', x: px(-3), y: px(CORRIDOR_Y), w: px(3), h: px(5), seed: 15 });
   floors.push({ kind: 'sidewalk', x: px(-3), y: px(CORRIDOR_Y + 5), w: px(2), h: px(south + 2 - CORRIDOR_Y - 5), seed: 16 });
 
-  // árvores ao norte (fileira com variação) e a oeste/leste
-  for (let x = bounds.x + 1; x < bounds.x + bounds.w - 1; x += 4 + Math.floor(rng() * 3)) {
-    props.push({ kind: rng() < 0.25 ? 'pine' : 'tree', x: px(x) + Math.floor(rng() * 8), y: px(-3) - Math.floor(rng() * 20), seed: Math.floor(rng() * 1e9) });
-    if (rng() < 0.6) props.push({ kind: 'bush', x: px(x + 2), y: px(-1) - 2, seed: Math.floor(rng() * 1e9) });
-  }
-  // bosque ao norte: fileiras irregulares cada vez mais esparsas
-  for (const [row, gap] of [
-    [-6, 5],
-    [-10, 6],
-    [-14, 8],
-  ] as const) {
-    for (let x = bounds.x + 2; x < bounds.x + bounds.w - 1; x += gap + Math.floor(rng() * 4)) {
-      props.push({ kind: rng() < 0.3 ? 'pine' : 'tree', x: px(x) + Math.floor(rng() * 8), y: px(row) - Math.floor(rng() * 12), seed: Math.floor(rng() * 1e9) });
-    }
-  }
-  for (const side of [-1, 1]) {
-    for (const band of [0, 7, 13]) {
-      const baseX = side < 0 ? -6 - band : w + 4 + band;
-      for (let y = 1; y < BUILDING_H; y += 3 + Math.floor(rng() * 3)) {
-        if (side < 0 && band === 0 && y >= CORRIDOR_Y - 1 && y <= south + 1) continue;
-        props.push({ kind: rng() < 0.3 ? 'pine' : 'tree', x: px(baseX + Math.floor(rng() * 5)), y: px(y + 1), seed: Math.floor(rng() * 1e9) });
-        if (band === 0 && rng() < 0.5) props.push({ kind: 'bush', x: px(side < 0 ? -2 : w + 1), y: px(y + 2), seed: Math.floor(rng() * 1e9) });
-      }
-    }
-  }
+  // ao norte e dos lados, o campus (bosque, edifícios, praça) é pintado na camada base: ver render/ku.ts
   // cerca viva + flores ao longo da fachada sul e postes na calçada; diante de cada slot de
   // projeto, o trecho do caminho do jardim só tem cerca quando há sala ali
   for (let x = 0; x < w; x += 2) {
@@ -83,12 +59,7 @@ export function layoutExterior(cols: number): ExteriorLayout {
   for (let x = bounds.x + 4; x < bounds.x + bounds.w; x += 10) {
     props.push({ kind: 'lamp', x: px(x), y: px(south + 3) + 6, seed: x });
   }
-  for (const row of [13, 17, 21]) {
-    for (let x = bounds.x + 3; x < bounds.x + bounds.w - 2; x += 6 + Math.floor(rng() * 5)) {
-      props.push({ kind: rng() < 0.2 ? 'pine' : 'tree', x: px(x) + Math.floor(rng() * 10), y: px(south + row) + Math.floor(rng() * 10), seed: Math.floor(rng() * 1e9) });
-      if (rng() < 0.3) props.push({ kind: 'bush', x: px(x + 3), y: px(south + row + 1), seed: Math.floor(rng() * 1e9) });
-    }
-  }
+  // ao sul da rua, o gramado com bancos e árvores é pintado na camada base: ver render/ku.ts
   props.push({ kind: 'bench', x: px(-4), y: px(CORRIDOR_Y + 3) + 6, seed: 1 });
   // totem com a marca na entrada principal (oeste)
   props.push({ kind: 'totem', x: px(-3) + 6, y: px(CORRIDOR_Y + 1), seed: 2 });

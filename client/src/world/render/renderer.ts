@@ -20,6 +20,9 @@ import { RoomFxRenderer } from './github-fx';
 import { Lighting } from './lighting';
 import { Particles } from './particles';
 import { carSprite, propSprite, shadowSprite } from './props';
+import { KU_SCALE, paintKuCampus, type KuSprite } from './ku';
+import { KuPeople, busSprite, type VehicleInfo, type Walker } from './ku-people';
+import { KuTraffic, peoplePhase, type Car } from './ku-traffic';
 import { countBadge, fallbackIcon } from './shell-sprites';
 import { decorateElevator, drawSeasonalLights, drawSeasonalWindow, seasonalCostume, seasonalFurniture } from './seasonal';
 import { buildAreaVis, furnitureSprites, opaqueBounds, paintShell, toWallVis, WALL_MARGIN, wallItemOrigin, wallSprites, type AreaVis, type FurnVis, type WallVis } from './scene';
@@ -30,22 +33,16 @@ const enum K {
   Char,
   Prop,
   Car,
+  Ku,
+  Walker,
 }
 
 interface Ent {
   k: K;
   y: number;
-  ref: FurnVis | Character | ExteriorProp | Car | null;
+  ref: FurnVis | Character | ExteriorProp | Car | KuSprite | Walker | null;
   area: AreaVis | null;
   scale: number;
-}
-
-interface Car {
-  x: number;
-  y: number;
-  dir: 1 | -1;
-  speed: number;
-  variant: number;
 }
 
 /** Posição da cabeça (px de mundo) de cada personagem desenhado neste frame. */
@@ -89,8 +86,13 @@ export class Renderer {
   private layoutVersion = -1;
   private assetsVersion = 0;
   private builtAssetsVersion = 0;
-  cars: Car[] = [];
-  private nextCarAt = 0;
+  private traffic = new KuTraffic();
+  get cars(): Car[] {
+    return this.traffic.cars;
+  }
+  /** Pessoas e objetos em pé do campus (ver ku.ts e ku-people.ts). */
+  private kuSprites: KuSprite[] = [];
+  private people: KuPeople | null = null;
   private ents: Ent[] = [];
   private pool: Ent[] = [];
   private date = new Date();
@@ -186,6 +188,22 @@ export class Renderer {
     ctx.imageSmoothingEnabled = false;
     ctx.translate(-this.baseX, -this.baseY);
     paintShell(this.art, ctx, this.exterior.floors, []);
+    const ku = paintKuCampus(ctx, {
+      bx: this.baseX,
+      by: this.baseY,
+      bw: c.width,
+      bh: c.height,
+      x0: 0,
+      x1: cols * COL_W * TILE,
+      y0: 0,
+      y1: BUILDING_H * TILE,
+      sidewalkY: (BUILDING_H + 2) * TILE,
+      southStripY: (BUILDING_H + 11) * TILE,
+      streetY0: (BUILDING_H + 4) * TILE,
+      streetY1: (BUILDING_H + 9) * TILE,
+    });
+    this.kuSprites = ku.sprites;
+    this.people = new KuPeople(ku.map, c.width);
     // faixas da rua
     const ly = this.exterior.streetY + Math.round(this.exterior.streetH / 2) - 1;
     ctx.fillStyle = 'rgba(255,236,170,0.75)';
@@ -322,7 +340,7 @@ export class Renderer {
     const { ctx, camera } = this;
     this.date.setTime(this.clock());
     this.dt = dt;
-    this.updateCars(now, dt);
+    this.updateTraffic(now, dt);
     const W = this.canvas.width;
     const H = this.canvas.height;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -462,7 +480,14 @@ export class Renderer {
         push(K.Prop, prop.y, prop, null, alpha);
       }
     }
-    for (const car of this.cars) if (visible(car.x - 24, car.y - 24, 48, 28)) push(K.Car, car.y, car, null, 1);
+    for (const car of this.cars) if (visible(car.x - 60, car.y - 40, 120, 48)) push(K.Car, car.y, car, null, 1);
+    for (const sp of this.kuSprites) {
+      if (!visible(sp.x, sp.y, sp.canvas.width * KU_SCALE, sp.canvas.height * KU_SCALE)) continue;
+      push(K.Ku, sp.depth, sp, null, 1);
+    }
+    if (this.people) {
+      for (const w of this.people.walkers) if (visible(w.x - 12, w.y - 28, 24, 32)) push(K.Walker, w.depth, w, null, 1);
+    }
     ents.sort((a, b) => a.y - b.y || a.k - b.k);
 
     this.iconCount = 0;
@@ -482,6 +507,14 @@ export class Renderer {
           break;
         case K.Car:
           this.drawCar(e.ref as Car);
+          break;
+        case K.Ku: {
+          const sp = e.ref as KuSprite;
+          this.ctx.drawImage(sp.canvas, Math.round(sp.x), Math.round(sp.y), sp.canvas.width * KU_SCALE, sp.canvas.height * KU_SCALE);
+          break;
+        }
+        case K.Walker:
+          this.drawWalker(e.ref as Walker);
           break;
       }
     }
@@ -1116,21 +1149,43 @@ export class Renderer {
   }
 
   private drawCar(car: Car): void {
-    const s = carSprite(car.variant, car.dir < 0);
+    const s = car.bus ? busSprite(car.bus, car.dir < 0) : carSprite(car.variant, car.dir < 0);
     this.ctx.drawImage(s.canvas, Math.round(car.x - s.ax), Math.round(car.y - s.ay));
   }
 
-  private updateCars(now: number, dt: number): void {
+  private drawWalker(w: Walker): void {
+    const sp = this.people!.sprite(w);
+    const shadow = shadowSprite();
+    if (w.alpha < 1) this.ctx.globalAlpha = Math.max(0, w.alpha);
+    this.ctx.drawImage(shadow.canvas, Math.round(w.x - shadow.ax), Math.round(w.y - shadow.ay));
+    this.ctx.drawImage(sp.canvas, Math.round(w.x - sp.ax), Math.round(w.y - sp.ay));
+    this.ctx.globalAlpha = 1;
+  }
+
+  private vehicleInfos(): VehicleInfo[] {
+    return this.cars.map((c) => ({ x: c.x, y: c.y, halfLen: c.half, moving: !c.stopped && c.speed > 0.5 }));
+  }
+
+  /** Carros e ônibus (ku-traffic.ts) e pessoas (ku-people.ts), com a faixa de pedestres no meio. */
+  private updateTraffic(now: number, dt: number): void {
     const b = this.exterior.bounds;
-    const x0 = b.x * TILE - 40;
-    const x1 = (b.x + b.w) * TILE + 40;
-    if (now >= this.nextCarAt) {
-      this.nextCarAt = now + 4000 + Math.random() * 9000;
-      const lane = this.exterior.lanes[Math.floor(Math.random() * this.exterior.lanes.length)];
-      if (lane) this.cars.push({ x: lane.dir > 0 ? x0 : x1, y: lane.y, dir: lane.dir, speed: 38 + Math.random() * 30, variant: Math.floor(Math.random() * 6) });
-    }
-    for (const c of this.cars) c.x += c.dir * c.speed * Math.min(dt, 0.1);
-    if (this.cars.length) this.cars = this.cars.filter((c) => c.x >= x0 - 10 && c.x <= x1 + 10);
+    const people = this.people;
+    const phase = peoplePhase(now);
+    const cross = people?.map.crossing;
+    this.traffic.update(
+      now,
+      dt,
+      {
+        lanes: this.exterior.lanes,
+        x0: b.x * TILE - 40,
+        x1: (b.x + b.w) * TILE + 40,
+        crossing: cross ? { x0: cross.x0, x1: cross.x1 } : null,
+        crowded: people ? people.onCrossing(phase) : false,
+        busStopX: people ? people.map.busStop.x : null,
+      },
+      (x, y) => people?.busArrived(x, y),
+    );
+    people?.update(dt, this.vehicleInfos(), this.traffic.dwelling, phase);
   }
 
   private drawPingPong(now: number): void {
