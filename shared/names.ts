@@ -5,23 +5,24 @@ export interface PersonName {
   look: 'f' | 'm';
 }
 
-// Nomes brasileiros para os personagens. Sem duplicatas e sem variações quase iguais
-// (ex.: Thiago/Tiago), para que cada personagem seja inconfundível no escritório.
+// Nomes coreanos de 20~30대 para os personagens (nada de nomes de gerações mais velhas, como "말숙" ou "익철").
+// Sem duplicatas e sem variações quase iguais, para que cada personagem seja inconfundível no escritório.
+// A ordem é a do antigo pool brasileiro (mesmo índice = mesma pessoa), que permitiu renomear quem já estava salvo.
 const F = [
-  'Ana', 'Beatriz', 'Camila', 'Daniela', 'Eduarda', 'Fernanda', 'Gabriela', 'Helena', 'Isabela', 'Júlia',
-  'Larissa', 'Mariana', 'Natália', 'Olívia', 'Paula', 'Rebeca', 'Sofia', 'Tatiana', 'Valentina', 'Yasmin',
-  'Alice', 'Bianca', 'Cecília', 'Débora', 'Elisa', 'Flávia', 'Giovana', 'Heloísa', 'Iara', 'Jéssica',
-  'Lívia', 'Manuela', 'Melissa', 'Nina', 'Priscila', 'Rafaela', 'Sabrina', 'Teresa', 'Vitória', 'Zoe',
-  'Aline', 'Bruna', 'Clara', 'Estela', 'Fabiana', 'Glória', 'Ingrid', 'Joana', 'Kátia', 'Lara',
-  'Maitê', 'Mirela', 'Noemi', 'Pietra', 'Renata', 'Simone', 'Sara', 'Vanessa', 'Luana', 'Marina',
+  '김서연', '이지우', '박하은', '최서윤', '정수빈', '강지민', '조유진', '윤채원', '장하윤', '임다은',
+  '한소율', '오지유', '서예린', '신아린', '권나연', '황민지', '안지현', '송예은', '류시은', '홍지아',
+  '김하늘', '이수아', '박다인', '최예나', '정은서', '강서현', '조민서', '윤세아', '장유나', '임지원',
+  '한채은', '오하린', '서다현', '신유빈', '권소미', '황가은', '안보라', '송미소', '류하나', '홍채린',
+  '김나은', '이도연', '박소현', '최아영', '정혜인', '강은채', '조하영', '윤서아', '장예서', '임가영',
+  '한지수', '오수민', '서하윤', '신다솜', '권유리', '황소희', '안채윤', '송지안', '류아윤', '홍서진',
 ];
 const M = [
-  'Arthur', 'Bruno', 'Caio', 'Diego', 'Enzo', 'Felipe', 'Gustavo', 'Henrique', 'Igor', 'João',
-  'Kauã', 'Lucas', 'Mateus', 'Nicolas', 'Otávio', 'Pedro', 'Rafael', 'Samuel', 'Thiago', 'Vinícius',
-  'Bernardo', 'Danilo', 'Davi', 'Emanuel', 'Fábio', 'Gael', 'Heitor', 'Hugo', 'Joaquim', 'Jorge',
-  'Leonardo', 'Lorenzo', 'Luan', 'Marcelo', 'Murilo', 'Noah', 'Otto', 'Raul', 'Renato', 'Ricardo',
-  'Rodrigo', 'Sérgio', 'Theo', 'Tomás', 'Ulisses', 'Vicente', 'Wagner', 'Yuri', 'Augusto', 'Benício',
-  'César', 'Douglas', 'Elias', 'Francisco', 'Guilherme', 'Ícaro', 'Jonas', 'Leandro', 'Miguel', 'Paulo',
+  '김민준', '이서준', '박도윤', '최예준', '정시우', '강하준', '조주원', '윤지호', '장준서', '임건우',
+  '한우진', '오지훈', '서현우', '신유찬', '권민재', '황선우', '안태윤', '송재원', '류승현', '홍도현',
+  '김준영', '이성민', '박지환', '최동현', '정민호', '강태민', '조현준', '윤재민', '장시윤', '임예찬',
+  '한규민', '오찬영', '서진우', '신지성', '권도훈', '황승우', '안정우', '송은우', '류하람', '홍재현',
+  '김태훈', '이현우', '박상우', '최윤호', '정원재', '강의찬', '조민규', '윤성호', '장대현', '임현수',
+  '한동윤', '오세훈', '서영민', '신재훈', '권해준', '황지훈', '안시현', '송민성', '류건호', '홍윤재',
 ];
 
 export const NAME_POOL: readonly PersonName[] = Object.freeze(

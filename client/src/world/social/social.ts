@@ -39,6 +39,7 @@ import * as L from './lines';
 import { bondBetween, hasTrait, personaFor, TRAITS, type Persona, type TraitId } from './persona';
 import { DELIVERY_REWARD, TURN_REWARD, Wallets, type StorageLike } from './wallet';
 import { tr } from '../../../../shared/i18n';
+import { coinText } from '../../../../shared/money';
 
 /** Texto flutuante sobre a cabeça ("+🪙10"), desenhado pelo overlay. */
 export interface Floater {
@@ -957,8 +958,8 @@ export class Social {
     const icon = KINDS[g.kind].emoji;
     const paid = g.bet ? this.wallets.transfer(l.id, w.id, g.bet, icon, what, now) : 0;
     if (paid) {
-      this.float(cw, `+🪙${paid}`, COIN_COLOR, now);
-      this.float(cl, `−🪙${paid}`, LOSS_COLOR, now);
+      this.float(cw, `+${coinText(paid)}`, COIN_COLOR, now);
+      this.float(cl, `−${coinText(paid)}`, LOSS_COLOR, now);
       this.sim.pushEffect({ kind: 'coins', charId: cl.id, toId: cw.id, at: now });
     }
     const score = g.kind === 'pingpong' || g.kind === 'videogame' ? tr(' ({0} a {1})', [Math.max(...g.score), Math.min(...g.score)]) : '';
@@ -1153,7 +1154,7 @@ export class Social {
   }
 
   private earned(ch: Character, v: number, now: number): void {
-    this.float(ch, `+🪙${v}`, COIN_COLOR, now);
+    this.float(ch, `+${coinText(v)}`, COIN_COLOR, now);
     if (!ch.icon) ch.setIcon('coin', 1_400, now);
   }
 

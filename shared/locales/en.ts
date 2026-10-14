@@ -653,6 +653,13 @@ export const EN: Readonly<Record<string, string>> = {
   "Notificações bloqueadas pelo navegador.": "Notifications blocked by the browser.",
   "Modo demonstração ligado.": "Demo mode on.",
   "Modo demonstração desligado.": "Demo mode off.",
+  "a inicialização automática só pode ser mudada pelo próprio computador": "Auto-start can only be changed from this computer",
+  "Inicialização": "Startup",
+  "Abrir ao ligar o computador": "Start when the computer turns on",
+  "Sobe o servidor do Habblaud sozinho quando você entra no Windows (tarefa agendada \"Habblaud Server\"). Desligar não fecha o que já está aberto.": "Starts the Habblaud server by itself when you sign in to Windows (the \"Habblaud Server\" scheduled task). Turning it off does not close what is already open.",
+  "Inicialização automática ligada.": "Auto-start on.",
+  "Inicialização automática desligada.": "Auto-start off.",
+  "Não foi possível mudar a inicialização automática.": "Could not change auto-start.",
   "Não foi possível mudar o modo demonstração.": "Couldn't change demo mode.",
 
   // client/src/ui/sidebar.ts

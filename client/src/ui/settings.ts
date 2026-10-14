@@ -90,6 +90,11 @@ export class SettingsPopover implements UiComponent {
   private language: ReturnType<typeof segmented<LanguageChoice>>;
   private soundGroup: SoundSettingsGroup;
   private demoGroup: HTMLElement;
+  /** Só no Windows e pelo próprio computador: ligar/desligar a tarefa agendada que sobe o servidor (GET/POST /api/autostart). */
+  private autostartGroup: HTMLElement;
+  private autostartSw: SwitchRefs;
+  private autostartOn = false;
+  private autostartBusy = false;
   /** Só na página do celular (porta remota com login): sair deste aparelho. */
   private remoteGroup: HTMLElement;
   private logoutBtn: HTMLButtonElement;
@@ -162,6 +167,14 @@ export class SettingsPopover implements UiComponent {
       sw('demo', tr('Modo demonstração'), tr('Coloca agentes fictícios no escritório, junto com os reais.'), () => void this.toggleDemo()),
     );
 
+    const autostart = switchRow(
+      tr('Abrir ao ligar o computador'),
+      tr('Sobe o servidor do Habblaud sozinho quando você entra no Windows (tarefa agendada "Habblaud Server"). Desligar não fecha o que já está aberto.'),
+      () => void this.toggleAutostart(),
+    );
+    this.autostartSw = autostart;
+    this.autostartGroup = h('div', { class: 'ui-set-group', hidden: true }, h('h3', { text: tr('Inicialização') }), autostart.row);
+
     this.logoutBtn = h('button', { class: 'ui-btn', type: 'button', text: tr('Sair'), on: { click: () => void this.logout() } }) as HTMLButtonElement;
     this.remoteGroup = h(
       'div',
@@ -206,13 +219,17 @@ export class SettingsPopover implements UiComponent {
       this.soundGroup.el,
       h('div', { class: 'ui-set-group' }, h('h3', { text: tr('Idioma') }), this.language.row),
       this.demoGroup,
+      this.autostartGroup,
       this.remoteGroup,
       this.about.el,
     );
     this.el.addEventListener('toggle', () => {
       this.anchor?.setAttribute('aria-expanded', String(this.isOpen));
       this.syncRootClass();
-      if (this.isOpen) this.render();
+      if (this.isOpen) {
+        this.render();
+        void this.refreshAutostart();
+      }
     });
   }
 
@@ -302,6 +319,50 @@ export class SettingsPopover implements UiComponent {
     const state = await this.notifier.enableBrowserNotifications();
     this.ctx.updatePrefs({ browserNotifications: state === 'granted' });
     if (state === 'denied') this.ctx.announce(tr('Notificações bloqueadas pelo navegador.'));
+  }
+
+  private paintAutostart(): void {
+    setAttr(this.autostartSw.btn, 'aria-checked', String(this.autostartOn));
+    this.autostartSw.btn.disabled = this.autostartBusy;
+  }
+
+  /** Pergunta ao servidor se a inicialização automática existe aqui (só o Windows, só pelo próprio computador). */
+  private async refreshAutostart(): Promise<void> {
+    if (access().remote) return;
+    try {
+      const res = await fetch('/api/autostart', { credentials: 'same-origin', cache: 'no-store' });
+      if (!res.ok) return;
+      const s = (await res.json()) as { supported?: boolean; enabled?: boolean };
+      setHidden(this.autostartGroup, s.supported !== true);
+      this.autostartOn = s.enabled === true;
+      this.paintAutostart();
+    } catch {
+      // sem servidor ou sem a rota: o grupo continua escondido
+    }
+  }
+
+  private async toggleAutostart(): Promise<void> {
+    if (this.autostartBusy) return;
+    this.autostartBusy = true;
+    this.paintAutostart();
+    const enable = !this.autostartOn;
+    try {
+      const res = await fetch('/api/autostart', {
+        method: 'POST',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ enabled: enable }),
+      });
+      const s = res.ok ? ((await res.json()) as { enabled?: boolean }) : null;
+      if (s) this.autostartOn = s.enabled === true;
+      this.ctx.announce(s ? (this.autostartOn ? tr('Inicialização automática ligada.') : tr('Inicialização automática desligada.')) : tr('Não foi possível mudar a inicialização automática.'));
+    } catch {
+      this.ctx.announce(tr('Não foi possível falar com o servidor.'));
+    } finally {
+      this.autostartBusy = false;
+      this.paintAutostart();
+    }
   }
 
   private async toggleDemo(): Promise<void> {

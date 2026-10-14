@@ -1,0 +1,531 @@
+
+  // Fila de desenho: objetos em pé são ordenados pela linha do chão (y). Os "dinâmicos" (árvores, bancos, mastros...)
+  // viram sprites separados, desenhados em tempo real junto com pessoas e veículos; os demais são pintados na camada base.
+  // Grade de caminhada (células de GC px de arte; 1 = dá para andar): começa tudo bloqueado, abrimos a praça e as calçadas
+  // e vamos bloqueando cada objeto; portas e bancos são registrados à medida que aparecem.
+  const GC = 4;
+  const gcols = Math.ceil(LW / GC);
+  const grows = Math.ceil(LH / GC);
+  const walk = new Uint8Array(gcols * grows);
+  const setCells = (x0: number, y0: number, x1: number, y1: number, v: number) => {
+    const cx0 = Math.max(0, Math.floor(x0 / GC));
+    const cy0 = Math.max(0, Math.floor(y0 / GC));
+    const cx1 = Math.min(gcols, Math.ceil(x1 / GC));
+    const cy1 = Math.min(grows, Math.ceil(y1 / GC));
+    for (let yy = cy0; yy < cy1; yy++) for (let xx = cx0; xx < cx1; xx++) walk[yy * gcols + xx] = v;
+  };
+  const openA = (x0: number, y0: number, x1: number, y1: number) => setCells(x0, y0, x1, y1, 1);
+  const blk = (x0: number, y0: number, x1: number, y1: number) => setCells(x0, y0, x1, y1, 0);
+  // Edifícios de verdade (não jardins): nenhuma árvore das laterais pode ter a copa por cima deles.
+  const bldgs: number[][] = [];
+  const bld = (x0: number, y0: number, x1: number, y1: number) => {
+    bldgs.push([x0, y0, x1, y1]);
+    blk(x0, y0, x1, y1);
+  };
+  const onBldg = (x: number, y: number, hw: number, h: number) => bldgs.some(([x0, y0, x1, y1]) => x + hw > x0 && x - hw < x1 && y > y0 && y - h < y1 - 6);
+  const PINE_BOX: [number, number] = [15, 58];
+  const treeBox = (sc: number): [number, number] => [16 * sc, 52 * sc];
+  const doors: KuDoor[] = [];
+  const benches: KuBench[] = [];
+  const addDoor = (id: string, ax: number, ay: number) => void doors.push({ id, x: g.bx + ax * S, y: g.by + ay * S });
+  const addBench = (ax: number, ay: number, w = 24) => {
+    blk(ax - 1, ay - 5, ax + w + 1, ay + 7);
+    benches.push({ x: g.bx + ax * S, y: g.by + ay * S, w: w * S });
+  };
+
+  type Block = [number, number, number, number] | null;
+  type Dyn = { ax: number; w: number; h: number; block: Block };
+  /** Bloqueio padrão: o tronco. Medidas relativas ao ponto (ax, y) do objeto. */
+  const dyn = (ax: number, w = 72, h = 84, block: Block = [-3, -4, 3, 1]): Dyn => ({ ax, w, h, block });
+  const sprites: KuSprite[] = [];
+  const toSprite = (y: number, draw: () => void, d: Dyn, offX: number, offY: number): KuSprite => {
+    const sc = document.createElement('canvas');
+    sc.width = d.w;
+    sc.height = d.h;
+    const sctx = sc.getContext('2d')!;
+    const bx = Math.round(d.ax + offX - d.w / 2);
+    const by = Math.round(y + offY - (d.h - 12));
+    sctx.translate(offX - bx, offY - by);
+    const prev = c;
+    c = sctx;
+    draw();
+    c = prev;
+    // recorta a caixa útil do desenho
+    const px = sctx.getImageData(0, 0, d.w, d.h).data;
+    let x0 = d.w;
+    let y0 = d.h;
+    let x1 = -1;
+    let y1 = -1;
+    for (let yy = 0; yy < d.h; yy++) {
+      for (let xx = 0; xx < d.w; xx++) {
+        if (px[(yy * d.w + xx) * 4 + 3] > 0) {
+          if (xx < x0) x0 = xx;
+          if (xx > x1) x1 = xx;
+          if (yy < y0) y0 = yy;
+          if (yy > y1) y1 = yy;
+        }
+      }
+    }
+    const cw = Math.max(1, x1 - x0 + 1);
+    const ch = Math.max(1, y1 - y0 + 1);
+    const out = document.createElement('canvas');
+    out.width = cw;
+    out.height = ch;
+    out.getContext('2d')!.drawImage(sc, x0, y0, cw, ch, 0, 0, cw, ch);
+    return { canvas: out, x: g.bx + (bx + x0) * S, y: g.by + (by + y0) * S, depth: g.by + (y + offY) * S };
+  };
+  const makeQueue = (offX = 0, offY = 0) => {
+    const items: { y: number; draw: () => void; d?: Dyn }[] = [];
+    return {
+      put: (y: number, draw: () => void, d?: Dyn) => {
+        if (d && d.block) blk(d.ax + offX + d.block[0], y + offY + d.block[1], d.ax + offX + d.block[2], y + offY + d.block[3]);
+        items.push({ y, draw, d });
+      },
+      flush: () => {
+        items.sort((p, q) => p.y - q.y);
+        for (const it of items) {
+          if (it.d) sprites.push(toSprite(it.y, it.draw, it.d, offX, offY));
+          else it.draw();
+        }
+        items.length = 0;
+      },
+    };
+  };
+
+  // ------------------------------------------------------------------ gramado e bosque
+  for (let y = 0; y < sidewalkA; y++) R(0, y, LW, 1, Math.floor(y / 14) % 2 ? GRASS[0] : GRASS[1]);
+  for (let i = 0; i < LW * 3; i++) R(rnd() * LW, rnd() * (sidewalkA - 4), 1, rnd() < 0.5 ? 2 : 1, rnd() < 0.5 ? GRASS[2] : GRASS[3]);
+  R(0, 0, LW, 70, '#6d9a7f');
+  for (let x = 0; x < LW; x += 2) R(x, 0, 2, 14 + Math.sin(x / 41) * 6 + Math.sin(x / 17) * 3, '#86b09a');
+  for (let i = 0; i < LW * 0.6; i++) R(rnd() * LW, rnd() * 70, 2, 1, rnd() < 0.5 ? '#5b8a70' : '#7fa98f');
+  let fs = 100;
+  const MIX = [DEEP, GREEN, DEEP, GREEN, GREEN];
+  for (const [y, step, r0, tint] of [[18, 10, 11, 0.5], [32, 11, 13, 0.25], [46, 12, 15, 0.08]]) {
+    for (let x = -8; x < LW + 12; x += step + Math.floor(rnd() * 5)) {
+      blob(x, y + rnd() * 5, r0 * (1.0 + rnd() * 0.25), r0 * 0.95, MIX[Math.floor(rnd() * MIX.length)], fs++, 9);
+      if (tint > 0.1) {
+        c.fillStyle = `rgba(130,170,150,${tint * 0.55})`;
+        c.fillRect(x - r0, y - r0, r0 * 2, r0 * 2);
+      }
+    }
+  }
+  const frontXs: number[] = [];
+  for (let x = -4; x < LW + 12; x += 15 + Math.floor(rnd() * 8)) frontXs.push(x);
+  for (const x of frontXs) {
+    R(x - 1, 56, 3, 14, '#4a3322');
+    R(x - 1, 56, 1, 14, '#6a4a30');
+    shadow(x + 2, 70, 7, 2, 0.3);
+  }
+  const frontTrees = frontXs.map((x) => {
+    const q = rnd();
+    return { x, y: 56 + rnd() * 4, rx: 13 + rnd() * 5, ry: 12 + rnd() * 3, col: q < 0.14 ? GINKGO : q < 0.22 ? MAPLE : null, pal: q < 0.6 ? GREEN : DEEP };
+  });
+  for (const t of frontTrees) if (!t.col) blob(t.x, t.y, t.rx, t.ry, t.pal, fs++, 9);
+  for (const t of frontTrees) if (t.col) blob(t.x, t.y, t.rx, t.ry, t.col, fs++, 9);
+
+  // ------------------------------------------------------------------ praça de pedra
+  const PY0 = 270 + oy;
+  for (let y = PY0; y < sidewalkA; y += 8) {
+    for (let x = ((y - PY0) / 8 % 2) * 8 - 16; x < LW; x += 16) {
+      const k = Math.floor(rnd() * 3);
+      R(x, y, 15, 7, PAVE[k === 2 ? 1 : k]);
+      R(x, y + 7, 16, 1, PAVE[2]);
+      R(x + 15, y, 1, 8, PAVE[2]);
+    }
+  }
+  R(0, PY0 - 2, LW, 2, STONE[2]);
+  R(0, PY0, LW, 1, '#e8e2d2');
+  R(0, PY0 + 5, LW, 2, CRIM[1]);
+  R(0, PY0 + 7, LW, 1, '#e8e2d2');
+
+  // canteiros de gramado com flores (ao lado do prédio, abaixo da fileira de edifícios)
+  const parterre = (x: number, y: number, w: number, h: number, seed: number) => {
+    blk(x - 3, y - 4, x + w + 3, y + h + 4);
+    R(x - 2, y - 2, w + 4, h + 4, STONE[2]);
+    R(x - 1, y - 1, w + 2, h + 2, STONE[0]);
+    R(x, y, w, h, GRASS[1]);
+    for (let i = 0; i < (w * h) / 12; i++) R(x + rnd() * w, y + rnd() * h, 1, 2, GRASS[3]);
+    for (let fx = x + 6; fx < x + w - 4; fx += 7) for (let fy = y + 6; fy < y + h - 4; fy += 7) R(fx, fy, 2, 2, (((fx + fy) / 7) | 0) % 2 ? CRIM[0] : '#f6f0e0');
+    hedge(x, y - 3, w, 6, GREEN, seed);
+    hedge(x, y + h - 3, w, 6, GREEN, seed + 7);
+  };
+  parterre(xL - 206, PY0 + 18, 76, 36, 11);
+  parterre(xL - 118, PY0 + 18, 76, 36, 13);
+  parterre(xR + 42, PY0 + 18, 76, 36, 17);
+  parterre(xR + 130, PY0 + 18, 76, 36, 19);
+
+  // faixa de pedestres no eixo central
+  const sY0 = (g.streetY0 - g.by) / S;
+  const sY1 = (g.streetY1 - g.by) / S;
+  for (let y = sY0 + 1; y < sY1 - 1; y += 4) R(cxA - 16, y, 32, 2, '#f1ede0');
+  const southA = (g.southStripY - g.by) / S;
+  openA(0, HB + oy + 3, LW, sY0); // jardim da frente, praça e calçada norte
+  openA(0, sY1, LW, southA); // calçada sul
+  openA(cxA - 16, sY0 - 1, cxA + 16, sY1 + 1); // faixa de pedestres
+  blk(xL - 2, yT, xR + 2, sidewalkA + 2); // o prédio e seus jardins
+
+  // folhas caídas (no chão, antes dos objetos em pé)
+  for (let i = 0; i < LW * 0.28; i++) {
+    const x = rnd() * LW;
+    const y = 90 + rnd() * (sidewalkA - 90);
+    if (x > xL && x < xR && y > yT) continue;
+    R(x, y, 2, 1, rnd() < 0.5 ? '#e0b72d' : rnd() < 0.5 ? '#bf3b2a' : '#c23a58');
+  }
+
+  // ------------------------------------------------------------------ fileira de edifícios (centro em cxA)
+  c.save();
+  c.translate(ox, oy);
+  const north = makeQueue(ox, oy);
+  const MX = 400;
+  const MY = 308;
+  blk(0, 0, LW, HB + oy + 3); // bosque e fileira de edifícios
+  blk(MX - 13 + ox, MY - 21 + oy, MX + 15 + ox, MY + 4 + oy); // o tigre da medalha
+  addDoor('hall-l', 400 - 15 + ox, HB + oy + 6);
+  addDoor('hall-r', 400 + 15 + ox, HB + oy + 6);
+  R(381, 240, 38, 30, '#d8d1c0');
+  for (let y = 240; y < 270; y += 4) R(381, y, 38, 1, '#bdb6a5');
+  R(379, 240, 2, 30, STONE[2]);
+  R(419, 240, 2, 30, STONE[2]);
+  disc(MX, MY, 33, '#a9a398');
+  disc(MX, MY, 31, '#e3ddcf');
+  disc(MX, MY, 27, CRIMSON);
+  disc(MX, MY, 24, '#e3ddcf');
+  for (let a2 = 0; a2 < 360; a2 += 30) {
+    const r = (a2 * Math.PI) / 180;
+    R(MX + Math.cos(r) * 29 - 1, MY + Math.sin(r) * 29 - 1, 3, 3, '#e3ddcf');
+  }
+  disc(MX, MY, 17, '#b6b0a4');
+  disc(MX, MY, 15, '#8d8a80');
+  disc(MX, MY, 13, '#a9a69c');
+  shadow(MX + 2, MY + 3, 14, 4, 0.3);
+  tiger(MX - 13, MY - 21);
+  R(MX - 6, MY + 1, 14, 3, CRIMSON);
+
+  shadow(400, HB + 3, 250, 4, 0.28);
+  // edifícios laterais da fileira: biblioteca à esquerda, castelo à direita, e mais, se a faixa for larga
+  const sideKinds: ((x: number) => void)[] = [
+    (x) => libraryHall(x, 154, HB),
+    (x) => gothicHall(x, 154, HB, 3, { door: true, spire: true }),
+    (x) => gothicHall(x, 156, HB, 3, { door: true, gable: x + 68 }),
+  ];
+  let leftEdge = 14 + ox;
+  for (let i = 0, lx = 14; lx + ox >= 0 && i < 6; i++, lx -= 158) {
+    sideKinds[i % 3](lx);
+    leftEdge = lx + ox;
+    addDoor(`row-l${i}`, lx + ox + (i % 3 === 2 ? 90 : 77), HB + oy + 6);
+  }
+  const rightKinds: ((x: number) => void)[] = [
+    (x) => castleHall(x, 156, HB),
+    (x) => gothicHall(x, 156, HB, 3, { door: true, gable: x + 68 }),
+    (x) => gothicHall(x, 154, HB, 3, { door: true, spire: true }),
+  ];
+  let rightEdge = 632 + ox + 156;
+  for (let i = 0, rx = 632; rx + 156 + ox <= LW && i < 6; i++, rx += 160) {
+    rightKinds[i % 3](rx);
+    rightEdge = rx + 156 + ox;
+    addDoor(`row-r${i}`, rx + ox + (i % 3 === 0 ? 78 : i % 3 === 1 ? 90 : 77), HB + oy + 6);
+  }
+
+  for (const wx of [200, 444]) {
+    const WW = 156;
+    roof(wx, 148, WW, 34);
+    for (let i = 0; i < 5; i++) dormer(wx + 16 + i * 31, 160);
+    ashlar(wx, 182, WW, HB - 182);
+    R(wx, 182, WW, 2, STONE[0]);
+    R(wx, 208, WW, 2, STONE[0]);
+    for (let i = 0; i < 9; i++) rect(wx + 6 + i * 16, 192, 9, 11);
+    for (let i = 0; i < 9; i++) {
+      if (i % 2 === 0) arch(wx + 7 + i * 16, 220, 8, 11);
+      else rect(wx + 6 + i * 16, 216, 9, 13);
+    }
+  }
+  for (const px of [172, 578]) {
+    ashlar(px, 160, 50, HB - 160);
+    stoneGable(px, 126, 50, 34);
+    R(px - 2, 158, 54, 3, STONE[0]);
+    R(px, 205, 50, 2, STONE[0]);
+    rect(px + 20, 140, 10, 9);
+    rect(px + 9, 172, 11, 12);
+    rect(px + 30, 172, 11, 12);
+    rect(px + 9, 190, 11, 12);
+    rect(px + 30, 190, 11, 12);
+    arch(px + 10, 222, 9, 11);
+    arch(px + 31, 222, 9, 11);
+    R(px, 160, 4, HB - 160, STONE[0]);
+    R(px + 46, 160, 4, HB - 160, STONE[2]);
+  }
+  // torre central, baixa e larga, com ameias, duas hastes e o grande estandarte carmesim
+  const TW = 88;
+  const TX = 400 - TW / 2;
+  ashlar(TX, 112, TW, HB - 112);
+  R(TX, 112, 9, HB - 112, STONE[0]);
+  R(TX + TW - 9, 112, 9, HB - 112, STONE[2]);
+  R(TX + 9, 112, 1, HB - 112, STONE[2]);
+  R(TX + TW - 10, 112, 1, HB - 112, STONE[0]);
+  R(TX - 3, 102, TW + 6, 11, STONE[0]);
+  R(TX - 3, 111, TW + 6, 2, STONE[2]);
+  for (let x = TX - 3; x < TX + TW + 3; x += 11) {
+    R(x, 94, 7, 9, STONE[0]);
+    R(x, 94, 7, 1, '#e6e9eb');
+    R(x + 6, 94, 1, 9, STONE[2]);
+  }
+  R(TX, 118, TW, 2, STONE[0]);
+  R(TX + 18, 58, 2, 40, '#e8e8ea');
+  R(TX + 66, 58, 2, 40, '#e8e8ea');
+  R(TX + 68, 60, 11, 7, '#c9272f');
+  R(TX + 68, 60, 11, 1, '#e5555c');
+  R(TX + 20, 60, 8, 5, '#f4f4f6');
+  R(TX + 31, HB - 32, 26, 32, '#d9dcde');
+  R(TX + 34, HB - 29, 20, 29, '#4a3322');
+  R(TX + 43, HB - 29, 2, 29, '#2e1f14');
+  for (const [dx, dy] of [[0, 0], [1, 0], [2, 0], [0, 1], [1, 1], [0, 2]]) {
+    R(TX + 34 + dx, HB - 29 + dy, 1, 1, '#d9dcde');
+    R(TX + 53 - dx, HB - 29 + dy, 1, 1, '#d9dcde');
+  }
+  const BX = TX + 21;
+  const BW = 46;
+  const BT = 122;
+  const BB = 214;
+  R(BX - 1, BT - 2, BW + 2, 3, '#4a4a52');
+  R(BX, BT, BW, BB - BT, CRIMSON);
+  R(BX, BT, 3, BB - BT, CRIM[0]);
+  R(BX + BW - 3, BT, 3, BB - BT, CRIM[2]);
+  for (const fx of [12, 24, 36]) R(BX + fx, BT + 2, 1, BB - BT - 4, CRIM[1]);
+  R(BX, BB - 4, BW, 4, CRIM[2]);
+  for (let x = BX; x < BX + BW; x += 3) R(x, BB, 1, 2, CRIM[2]);
+  tigerEmblem(BX + BW / 2, BT + 12);
+  for (const [x, y, p] of [[207, 228, CRIM], [326, 232, GREEN], [470, 230, CRIM], [598, 226, GREEN]] as [number, number, string[]][]) ivy(x, y, p, x * 7 + y);
+
+  // jardim em frente: estátua, arbustos redondos, pinheiros, árvores, mastros e estudantes (do fundo para a frente)
+  north.put(HB + 16, () => statue(400, HB + 14), dyn(400, 60, 100, [-11, -27, 11, 1]));
+  for (const side of [0, 1]) {
+    const m = (x: number) => (side ? 800 - x : x);
+    for (const [x, yy, rx, ry, sd] of [[198, 251, 14, 9, 11], [232, 250, 15, 9, 12], [266, 251, 15, 9, 13], [300, 250, 14, 9, 14], [336, 251, 14, 9, 15], [216, 264, 17, 10, 16], [254, 265, 17, 10, 17], [292, 264, 17, 10, 18], [332, 265, 16, 10, 19]]) {
+      north.put(yy + ry, () => mound(m(x), yy, rx, ry, sd + side * 40), dyn(m(x), 60, 40, [-(rx - 2), -(2 * ry - 2), rx - 2, -1]));
+    }
+  }
+  for (const [x, y, pal, s, seed] of [[150, 258, GINKGO, 0.9, 301], [650, 258, GINKGO, 0.9, 311], [100, 262, MAPLE, 0.85, 305], [700, 262, MAPLE, 0.85, 317]] as [number, number, string[], number, number][]) {
+    north.put(y, () => tree(x, y, pal, s, seed), dyn(x));
+  }
+  for (const fx of [262, 538]) {
+    north.put(346, () => {
+      R(fx, 294, 2, 52, '#6a6a70');
+      R(fx + 2, 296, 24, 14, CRIMSON);
+      R(fx + 2, 296, 24, 2, CRIM[0]);
+      R(fx + 2, 308, 24, 2, CRIM[2]);
+      letters('KU', fx + 8, 299, '#fff');
+      R(fx - 3, 344, 8, 3, STONE[1]);
+    }, dyn(fx + 12, 56, 84, [-13, -3, -9, 1]));
+  }
+  north.flush();
+  c.restore();
+
+  // ------------------------------------------------------------------ praça: edifícios laterais, árvores e bancos
+  const side = makeQueue();
+  const baseSide = sidewalkA - 100;
+  const lx0 = xL - 54 - 142;
+  const rx0 = xR + 54;
+  // campus de ciências: edifícios de vidro e concreto nas pontas da fileira de edifícios
+  if (leftEdge - 120 >= 0) {
+    side.put(HB + oy, () => scienceHall(leftEdge - 120, 114, HB + oy, false));
+    addDoor('sci-row-l', leftEdge - 120 + 57, HB + oy + 6);
+  }
+  if (rightEdge + 120 <= LW) {
+    side.put(HB + oy, () => scienceHall(rightEdge + 6, 114, HB + oy, true));
+    addDoor('sci-row-r', rightEdge + 6 + 57, HB + oy + 6);
+  }
+  if (lx0 >= 0) {
+    side.put(baseSide, () => gothicHall(lx0, 142, baseSide, 4, { door: true, gable: lx0 + 48 }));
+    bld(lx0 - 2, baseSide - 170, lx0 + 144, baseSide + 3);
+    addDoor('bld-l', lx0 + 70, baseSide + 6);
+  }
+  if (rx0 + 142 <= LW) {
+    bld(rx0 - 2, baseSide - 184, rx0 + 144, baseSide + 3);
+    addDoor('bld-r', rx0 + 71, baseSide + 6);
+    side.put(baseSide, () => {
+      gothicHall(rx0, 142, baseSide, 4, { door: true, gable: rx0 + 49, spire: true, spireRight: true });
+      for (const bx of [rx0 + 34, rx0 + 96]) {
+        R(bx, baseSide - 66, 8, 30, CRIMSON);
+        R(bx, baseSide - 38, 8, 2, CRIM[2]);
+        R(bx + 1, baseSide - 58, 6, 1, '#fff');
+        R(bx + 1, baseSide - 55, 6, 1, '#fff');
+      }
+    });
+  }
+  // blocos do campus de ciências nos cantos de fora: edifício, gramado com o letreiro "KU" e pavilhão de vidro (como o Hana Square)
+  const sciW = 112;
+  if (lx0 - 8 >= sciW) {
+    bld(2, baseSide + 2 - 100, sciW + 16, baseSide + 5);
+    blk(4, baseSide + 12, sciW + 12, baseSide + 48);
+    addDoor('sci-l', 8 + 56, baseSide + 10);
+    side.put(baseSide + 2, () => scienceHall(8, sciW, baseSide + 2, false));
+    side.put(baseSide + 40, () => {
+      R(6, baseSide + 6, sciW + 4, 40, STONE[2]);
+      R(8, baseSide + 8, sciW, 36, GRASS[1]);
+      for (let i = 0; i < 70; i++) R(8 + rnd() * sciW, baseSide + 8 + rnd() * 36, 1, 2, GRASS[3]);
+      hedge(8, baseSide + 6, sciW, 6, GREEN, 301);
+      bigLetters('KU', 8 + sciW / 2 - 22, baseSide + 14, 4, '#f4f4f6', '#8f969c');
+    });
+  }
+  const sciRX = LW - 8 - sciW;
+  if (rx0 + 142 + 8 + sciW <= LW) {
+    bld(sciRX - 8, baseSide + 4 - 100, LW - 2, baseSide + 7);
+    blk(sciRX + 6, baseSide + 12, sciRX + sciW - 4, baseSide + 46);
+    addDoor('sci-r', sciRX + 56, baseSide + 10);
+    side.put(baseSide + 4, () => scienceHall(sciRX, sciW, baseSide + 4, true));
+    side.put(baseSide + 46, () => glassPavilion(sciRX + 8, baseSide + 40, sciW - 16));
+  }
+  // bosques de pinheiros, ginkgos e bordos nas laterais da praça
+  const grove = (gx0: number, gx1: number, gy0: number, gy1: number, n: number, seedBase: number) => {
+    for (let i = 0; i < n; i++) {
+      let gx = gx0 + rnd() * (gx1 - gx0);
+      let gy = gy0 + rnd() * (gy1 - gy0);
+      const kind = rnd();
+      const sc = 0.85 + rnd() * 0.25;
+      const [hw, h] = kind < 0.38 ? PINE_BOX : treeBox(sc);
+      for (let k = 0; k < 12 && onBldg(gx, gy, hw, h); k++) {
+        gx = gx0 + rnd() * (gx1 - gx0);
+        gy = gy0 + rnd() * (gy1 - gy0);
+      }
+      if (onBldg(gx, gy, hw, h)) continue;
+      if (kind < 0.38) side.put(gy, () => pine(gx, gy, seedBase + i), dyn(gx, 60, 84));
+      else side.put(gy, () => tree(gx, gy, kind < 0.62 ? GINKGO : kind < 0.85 ? MAPLE : GREEN, sc, seedBase + i), dyn(gx));
+    }
+  };
+  grove(6, 100, PY0 + 24, baseSide - 70, 11, 700);
+  grove(LW - 100, LW - 6, PY0 + 24, baseSide - 70, 11, 800);
+  // árvores ao lado do prédio; o banco fica atrás da copa (y menor)
+  for (const [x, y, pal, s, seed] of [[xL - 21, yT + 54, GINKGO, 1.0, 421], [xR + 22, yT + 54, GINKGO, 1.0, 423], [xL - 93, yT + 70, MAPLE, 0.95, 425], [xR + 94, yT + 70, MAPLE, 0.95, 427]] as [number, number, string[], number, number][]) {
+    if (onBldg(x, y, ...treeBox(s))) continue;
+    side.put(y, () => tree(x, y, pal, s, seed), dyn(x));
+  }
+  addBench(xL - 49, yT + 16);
+  addBench(xR + 26, yT + 16);
+  side.put(yT + 23, () => bench(xL - 49, yT + 16), dyn(xL - 37, 40, 24, null));
+  side.put(yT + 23, () => bench(xR + 26, yT + 16), dyn(xR + 38, 40, 24, null));
+  side.put(yT - 13, () => bin(xL - 7, yT - 20), dyn(xL - 4, 20, 20, [-3, -8, 4, 1]));
+  side.put(yT - 13, () => bin(xR + 4, yT - 20), dyn(xR + 7, 20, 20, [-3, -8, 4, 1]));
+  side.put(baseSide + 20, () => bikeRack(xL - 29, baseSide + 14), dyn(xL - 19, 32, 20, [-11, -9, 11, 1]));
+  side.put(baseSide + 26, () => bikeRack(xR + 16, baseSide + 20), dyn(xR + 26, 32, 20, [-11, -9, 11, 1]));
+  // canto de fora dos edifícios laterais: pinheiros
+  if (!onBldg(22, baseSide + 4, ...PINE_BOX)) side.put(baseSide + 4, () => pine(22, baseSide + 4, 91), dyn(22, 60, 84));
+  if (!onBldg(LW - 22, baseSide + 10, ...PINE_BOX)) side.put(baseSide + 10, () => pine(LW - 22, baseSide + 10, 93), dyn(LW - 22, 60, 84));
+  // aleia de ginkgos e bordo ao longo da calçada, com bancos atrás dos troncos
+  const lowY = sidewalkA - 20;
+  const lowXs: number[] = [];
+  for (let x = 24; x < xL - 24; x += 50) lowXs.push(x);
+  for (let x = xR + 40; x < LW - 20; x += 50) lowXs.push(x);
+  lowXs.forEach((x, i) => {
+    if ((x >= xL - 160 && x <= xL - 4) || (x >= xR + 4 && x <= xR + 160) || x < 130 || x > sciRX - 8) return;
+    if (onBldg(x, lowY, ...treeBox(0.95))) return;
+    side.put(lowY, () => tree(x, lowY, i % 3 === 0 ? MAPLE : GINKGO, 0.95, 500 + i), dyn(x));
+    if (i % 2 === 0) {
+      addBench(x - 12, lowY - 12);
+      side.put(lowY - 5, () => bench(x - 12, lowY - 12), dyn(x, 40, 24, null));
+    }
+  });
+  // portão principal: dois conjuntos de pilares de pedra com portões de ferro verde-azulados, emoldurando o caminho até o prédio
+  const gateY = sidewalkA - 6;
+  side.put(gateY, () => gateUnit(xL - 150, gateY, 1));
+  side.put(gateY, () => gateUnit(xR + 150, gateY, -1));
+  bld(xL - 152, gateY - 86, xL - 150 + 86, gateY + 1);
+  bld(xR + 150 - 86, gateY - 86, xR + 152, gateY + 1);
+  for (const x of [xL - 40, xL - 28, xR + 28, xR + 40]) side.put(sidewalkA - 14, () => bushPot(x, sidewalkA - 14), dyn(x, 24, 30, [-6, -8, 6, 1]));
+  side.put(sidewalkA - 2, () => {
+    hedge(0, sidewalkA - 12, xL - 68, 9, GREEN, 61);
+    hedge(xR + 68, sidewalkA - 12, LW - xR - 68, 9, GREEN, 63);
+  });
+  // a cerca viva deixa uma passagem de cada lado do prédio, entre o portão e a fachada
+  blk(0, sidewalkA - 12, xL - 68, sidewalkA - 2);
+  blk(xR + 68, sidewalkA - 12, LW, sidewalkA - 2);
+  for (const x of [xL - 210, xL - 14, xR + 14, xR + 210]) {
+    blk(x - 1, sidewalkA - 16, x + 3, sidewalkA - 13);
+    side.put(sidewalkA - 14, () => lamp(x, sidewalkA - 14));
+  }
+  // ------------------------------------------------------------------ rua em frente: lojas, estação (linha 6) e ponto de ônibus
+  for (let y = southA; y < LH; y += 8) {
+    for (let x = (((y - southA) / 8) % 2) * 8 - 16; x < LW; x += 16) {
+      const k = Math.floor(rnd() * 3);
+      R(x, y, 15, 7, PAVE[k === 2 ? 1 : k]);
+      R(x, y + 7, 16, 1, PAVE[2]);
+      R(x + 15, y, 1, 8, PAVE[2]);
+    }
+  }
+  R(0, southA, LW, 2, STONE[2]);
+  const shopBase = LH - 8;
+  const stationX = Math.round(cxA + 190);
+  const busX = Math.round(cxA - 230);
+  let sx2 = -4;
+  let si = 0;
+  while (sx2 < LW) {
+    const sw = 44 + Math.floor(rnd() * 28);
+    const sh = 44 + Math.floor(rnd() * 26);
+    const idx = si++;
+    const hitsStation = sx2 + sw > stationX - 6 && sx2 < stationX + 66;
+    const hitsBus = sx2 + sw > busX - 6 && sx2 < busX + 52;
+    if (!hitsStation && !hitsBus) {
+      const x0s = sx2;
+      side.put(southA + 8, () => shop(x0s, sw, sh, shopBase, idx));
+    }
+    sx2 += sw + 2;
+  }
+  openA(stationX - 2, southA, stationX + 60, shopBase - 12); // a boca da estação fica acessível
+  addDoor('station', stationX + 24, shopBase - 14);
+  side.put(southA + 10, () => subwayEntrance(stationX, shopBase));
+  side.put(southA + 10, () => busStop(busX, shopBase));
+  let ti = 0;
+  for (let x = 30; x < LW - 10; x += 70 + Math.floor(rnd() * 20), ti++) {
+    const ty = LH - 4;
+    const pal = [GINKGO, GINKGO, MAPLE, GINKGO][ti % 4];
+    if ((x > stationX - 14 && x < stationX + 74) || (x > busX - 14 && x < busX + 56)) continue;
+    side.put(ty, () => tree(x, ty, pal, 0.78, 600 + ti), dyn(x));
+  }
+  side.put(LH, () => hedge(0, LH - 9, LW, 8, GREEN, 81));
+  side.flush();
+
+  // O prédio e a faixa até a calçada ficam transparentes: salas, jardins e cercas vivas vêm da camada base.
+  c.clearRect(xL, yT, xR - xL, sidewalkA - yT);
+
+  // ------------------------------------------------------------------ mapa de caminhada (px de mundo)
+  const WX = (a: number) => g.bx + a * S;
+  const WY = (a: number) => g.by + a * S;
+  const open = (cx: number, cy: number) => cx >= 0 && cy >= 0 && cx < gcols && cy < grows && walk[cy * gcols + cx] === 1;
+  const roomy = (cx: number, cy: number) => {
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (!open(cx + dx, cy + dy)) return false;
+    return true;
+  };
+  // pontos para passear: células livres com folga em volta, sorteadas
+  const cand: { x: number; y: number }[] = [];
+  for (let cy = 0; cy < grows; cy += 3) {
+    for (let cx = 0; cx < gcols; cx += 3) {
+      if (roomy(cx, cy)) cand.push({ x: g.bx + (cx + 0.5) * GC * S, y: g.by + (cy + 0.5) * GC * S });
+    }
+  }
+  for (let i = cand.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    [cand[i], cand[j]] = [cand[j], cand[i]];
+  }
+  const pois: Pt[] = cand.slice(0, 160);
+  // entradas e saídas nas bordas do mundo (praça, fachada, calçada norte, calçada sul)
+  const portals: Pt[] = [];
+  for (const ay of [PY0 + 14, yT - 6, sidewalkA + 8, sY1 + 8]) {
+    for (const ax of [3, LW - 3]) {
+      if (open(Math.floor(ax / GC), Math.floor(ay / GC))) portals.push({ x: WX(ax), y: WY(ay) });
+    }
+  }
+  const map: KuMap = {
+    cell: GC * S,
+    ox: g.bx,
+    oy: g.by,
+    cols: gcols,
+    rows: grows,
+    walk,
+    doors,
+    benches,
+    crossing: { x0: WX(cxA - 16), x1: WX(cxA + 16), y0: g.streetY0, y1: g.streetY1 },
+    busStop: { x: WX(busX + 18), y: WY(sY1 + 8) },
+    portals,
+    pois,
+  };
+  return { lo, sprites, map };
+}

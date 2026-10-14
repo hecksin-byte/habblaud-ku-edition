@@ -4,11 +4,12 @@ import type { AgentSocial } from '../world/api';
 import type { UiContext } from './context';
 import { h, setHidden, setText, setTitle } from './dom';
 import { plural, relativeTime } from './format';
-import { tr } from '../../../shared/i18n';
+import { getLocale, tr } from '../../../shared/i18n';
+import { coinText } from '../../../shared/money';
 
 /** "+🪙10" / "−🪙10" (sinal tipográfico de menos). */
 export function coinDelta(delta: number): string {
-  return `${delta >= 0 ? '+' : '−'}🪙${Math.abs(delta)}`;
+  return `${delta >= 0 ? '+' : '−'}${coinText(Math.abs(delta))}`;
 }
 
 /** "3 vitórias · 1 derrota" (ou "Sem partidas ainda"). */
@@ -78,7 +79,7 @@ export class SocialSection {
     const s: AgentSocial | null = this.ctx.world.social?.(id) ?? null;
     setHidden(this.el, !s);
     if (!s) return;
-    setText(this.extra, `🪙 ${s.coins}`);
+    setText(this.extra, getLocale() === 'ko' ? coinText(s.coins) : `🪙 ${s.coins}`);
     setText(this.doing, s.doing ?? '');
     setHidden(this.doing, !s.doing);
     setText(this.coins, tr('{0} moedinhas', [s.coins]));

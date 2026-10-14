@@ -438,3 +438,41 @@ describe('guarda de Host/Origin', () => {
     expect(originAllowed('file://', 'localhost:4747', allowed)).toBe(false);
   });
 });
+
+describe('GET/POST /api/autostart (inicialização automática do Windows)', () => {
+  let env: Awaited<ReturnType<typeof start>>;
+  let state = { supported: true, installed: true, enabled: false };
+
+  beforeEach(async () => {
+    state = { supported: true, installed: true, enabled: false };
+    const autostart = {
+      get: async () => state,
+      set: async (enabled: boolean) => ((state = { ...state, enabled }), state),
+    };
+    env = await start({ autostart });
+  });
+  afterEach(async () => {
+    await env.close();
+    env.cleanup();
+  });
+
+  it('lê o estado e liga/desliga pelo próprio computador', async () => {
+    expect(await (await fetch(`${env.base}/api/autostart`)).json()).toEqual({ supported: true, installed: true, enabled: false });
+    const on = await fetch(`${env.base}/api/autostart`, { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ enabled: true }) });
+    expect(await on.json()).toEqual({ supported: true, installed: true, enabled: true });
+    expect(state.enabled).toBe(true);
+    const off = await fetch(`${env.base}/api/autostart`, { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ enabled: false }) });
+    expect(((await off.json()) as { enabled: boolean }).enabled).toBe(false);
+  });
+
+  it('recusa corpo inválido, método errado, outro site e Host que não é do próprio computador', async () => {
+    expect((await fetch(`${env.base}/api/autostart`, { method: 'POST', headers: JSON_HEADERS, body: '{"enabled":"sim"}' })).status).toBe(400);
+    expect((await fetch(`${env.base}/api/autostart`, { method: 'PUT', headers: JSON_HEADERS, body: '{}' })).status).toBe(405);
+    expect((await fetch(`${env.base}/api/autostart`, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: '{"enabled":true}' })).status).toBe(415);
+    const cross = await raw(env.base, '/api/autostart', { method: 'POST', headers: { ...JSON_HEADERS, Origin: 'http://attacker.example' }, body: '{"enabled":true}' });
+    expect(cross.status).toBe(403);
+    const lan = await raw(env.base, '/api/autostart', { method: 'POST', headers: { ...JSON_HEADERS, Host: 'habblaud.lan' }, body: '{"enabled":true}' });
+    expect(lan.status).toBe(403);
+    expect(state.enabled).toBe(false);
+  });
+});

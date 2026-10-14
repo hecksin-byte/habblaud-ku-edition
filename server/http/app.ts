@@ -22,6 +22,7 @@ import { AUDIO_BODY_MAX, type DictationService } from '../dictation/dictation';
 import type { DeliveryIndex } from '../deliveries/deliveries';
 import type { FileFetcher } from '../deliveries/fetcher';
 import { HOST_WAIT_MS } from '../host-wait';
+import { createAutostart, type AutostartController } from '../autostart';
 
 export interface ApiDeps {
   office: Office;
@@ -30,6 +31,8 @@ export interface ApiDeps {
   sources: () => SourceInfo[];
   version: string;
   inDocker: boolean;
+  /** Inicialização automática do Windows (/api/autostart); sem isto, usa a tarefa agendada de verdade. */
+  autostart?: AutostartController;
   /** Terminal ligado (ServerConfig.terminal: só com bind local). */
   terminal?: boolean;
   /** Streams do terminal; sem eles o recurso fica desligado mesmo com `terminal`. */
@@ -120,7 +123,8 @@ function isLocalOnlyPath(path: string): boolean {
     path === '/api/mod/inbox' ||
     path === '/api/mod/inbox/ack' ||
     path.startsWith('/api/codex/') ||
-    path.startsWith('/api/host/')
+    path.startsWith('/api/host/') ||
+    path === '/api/autostart'
   );
 }
 
@@ -257,6 +261,7 @@ export function modSummary(
 /** Devolve um handler que trata /api/* e responde false para o resto. */
 export function createApiHandler(deps: ApiDeps): (req: IncomingMessage, res: ServerResponse, url: URL) => boolean {
   const { office, hub, accounts } = deps;
+  const autostart = deps.autostart ?? createAutostart({ inDocker: deps.inDocker });
   const terminals = deps.terminal ? deps.terminals : undefined;
 
   const isRemote = (req: IncomingMessage): boolean => !!deps.remote?.is(req);
@@ -279,6 +284,12 @@ export function createApiHandler(deps: ApiDeps): (req: IncomingMessage, res: Ser
     if (typeof body?.enabled !== 'boolean') throw new HttpError(400, tr('esperado {enabled: boolean}'));
     office.setDemo(body.enabled);
     sendJson(res, 200, { ok: true, demo: office.isDemo() });
+  };
+
+  const handleAutostart = async (req: IncomingMessage, res: ServerResponse) => {
+    const body = (await readJson(req)) as { enabled?: unknown };
+    if (typeof body?.enabled !== 'boolean') throw new HttpError(400, tr('esperado {enabled: boolean}'));
+    sendJson(res, 200, await autostart.set(body.enabled));
   };
 
   const handleCharacter = async (req: IncomingMessage, res: ServerResponse, id: string, method: string) => {
@@ -663,6 +674,16 @@ export function createApiHandler(deps: ApiDeps): (req: IncomingMessage, res: Ser
     }
     if (path === '/api/stats' || path.startsWith('/api/stats/')) {
       handleStatsRoute(req, res, url, deps.stats, sendJson);
+      return true;
+    }
+    if (path === '/api/autostart') {
+      // Liga/desliga a tarefa agendada do Windows que sobe o servidor: muda o computador, então só pelo próprio computador.
+      if (!isRead && method !== 'POST') methodNotAllowed(res, 'GET, POST');
+      else if (isRemote(req) || !isLoopbackHost(req.headers.host)) {
+        req.resume();
+        sendJson(res, 403, { error: tr('a inicialização automática só pode ser mudada pelo próprio computador') });
+      } else if (isRead) autostart.get().then((s) => sendJson(res, 200, s)).catch((err) => fail(res, err));
+      else handleAutostart(req, res).catch((err) => fail(res, err));
       return true;
     }
     if (path === '/api/demo') {

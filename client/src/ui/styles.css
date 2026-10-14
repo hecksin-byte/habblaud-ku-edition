@@ -717,6 +717,20 @@
   }
 }
 
+/* Selo da edição do campus (고려대): vinho com letras claras, na mesma altura do selo de versão. */
+.ui-ku-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: #8b0029;
+  color: #fff;
+  font: 700 10.5px/1 var(--font-ui);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
 .ui-demo-badge {
   font-size: 10.5px;
   font-weight: 600;

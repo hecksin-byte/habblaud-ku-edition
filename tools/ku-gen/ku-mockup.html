@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>Habblaud KU 시안 v3</title>
+<style>html,body{margin:0;background:#222}canvas{display:block;image-rendering:pixelated}</style></head>
+<body><canvas id="hi" width="1600" height="1448"></canvas>
+<script>
+const CRIMSON = '#8b0029';           // 근사값(공식 CI 값은 미확인)
+const CRIM = ['#c23a58', '#9c1236', '#6f0a27', '#4a0618'];
+const W = 800, H = 724;
+const OX = 153, OY = 350;            // 사무실 합성 위치(아트 픽셀)
+const SY = 652;                      // 도로 시작
+const lo = document.createElement('canvas'); lo.width = W; lo.height = H;
+const c = lo.getContext('2d');
+const R = (x, y, w, h, col) => { c.fillStyle = col; c.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); };
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const rnd = mulberry32(20261014);
+
+const GRASS = ['#6fae52', '#66a64b', '#5b9a42', '#7bbb5d'];
+const GINKGO = ['#f3d34a', '#e0b72d', '#b98a1c', '#7a5710'];
+const MAPLE = ['#e0603a', '#bf3b2a', '#8e2420', '#561514'];
+const GREEN = ['#4f8f45', '#3d7a3c', '#2c5f31', '#1c3f22'];
+const DEEP = ['#356b38', '#2a5a30', '#1f4526', '#14301a'];
+const STONE = ['#cbcfd2', '#b1b6ba', '#90969b'];
+const PAVE = ['#d2cdc2', '#c9c4b9', '#bdb8ad'];
+
+/* ---------- 기본 도구 ---------- */
+function blob(cx, cy, rx, ry, pal, seed, n = 7) {
+  const r = mulberry32(seed), cs = [];
+  for (let i = 0; i < n; i++) {
+    const a = r() * 6.283, d = r() * 0.55;
+    cs.push([cx + Math.cos(a) * rx * d, cy + Math.sin(a) * ry * d * 0.9, rx * (0.45 + r() * 0.3), ry * (0.45 + r() * 0.3)]);
+  }
+  const x0 = Math.floor(cx - rx * 1.3), y0 = Math.floor(cy - ry * 1.3);
+  const w = Math.ceil(rx * 2.6) + 2, h = Math.ceil(ry * 2.6) + 2;
+  const m = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const X = x0 + x, Y = y0 + y;
+    for (const [a, b, rx2, ry2] of cs) if (((X - a) / rx2) ** 2 + ((Y - b) / ry2) ** 2 <= 1) { m[y * w + x] = 1; break; }
+  }
+  const at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h) ? 0 : m[y * w + x];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (!at(x, y)) continue;
+    const X = x0 + x, Y = y0 + y;
+    const t = ((X - cx) / rx) * 0.55 + ((Y - cy) / ry) * 0.9;
+    let k = t < -0.3 ? 0 : t > 0.35 ? 2 : 1;
+    if (r() < 0.14) k = Math.max(0, Math.min(2, k + (r() < 0.5 ? -1 : 1)));
+    if (!at(x - 1, y) || !at(x + 1, y) || !at(x, y - 1) || !at(x, y + 1)) k = 3;
+    R(X, Y, 1, 1, pal[k]);
+  }
+}
+function shadow(cx, cy, rx, ry, a = 0.2) {
+  c.fillStyle = `rgba(20,30,20,${a})`;
+  for (let y = -ry; y <= ry; y++) { const w = Math.round(rx * Math.sqrt(1 - (y / ry) ** 2)); c.fillRect(Math.round(cx - w), Math.round(cy + y), w * 2, 1); }
+}
+function disc(cx, cy, r, col) { for (let y = -r; y <= r; y++) { const w = Math.round(Math.sqrt(r * r - y * y)); R(cx - w, cy + y, w * 2, 1, col); } }
+function tree(x, y, pal, s = 1, seed = 1) {
+  shadow(x + 3, y, 14 * s, 4 * s);
+  R(x - 1, y - 15 * s, 3, 15 * s, '#5b3a24'); R(x - 1, y - 15 * s, 1, 15 * s, '#74502f');
+  blob(x, y - 28 * s, 17 * s, 15 * s, pal, seed, 8);
+}
+function hedge(x, y, w, h = 6, pal = GREEN, seed = 5) { for (let i = 0; i < w; i += 6) blob(x + i + 3, y + h / 2, 5, h / 2 + 1, pal, seed + i, 3); }
+const GLY = { K: ['10010', '10100', '11000', '11000', '10100', '10010', '10001'], U: ['10001', '10001', '10001', '10001', '10001', '10001', '01110'] };
+function letters(str, x, y, col) { let cx = x; for (const ch of str) { GLY[ch].forEach((row, j) => [...row].forEach((v, i) => { if (v === '1') R(cx + i, y + j, 1, 1, col); })); cx += 6; } }
+function ashlar(x, y, w, h, base = STONE[1]) {
+  R(x, y, w, h, base);
+  for (let yy = y; yy < y + h; yy += 5) {
+    R(x, yy, w, 1, STONE[2]);
+    const off = (((yy - y) / 5) % 2) * 6;
+    for (let xx = x + off; xx < x + w; xx += 12) R(xx, yy, 1, 5, STONE[2]);
+  }
+  for (let i = 0; i < w * h / 70; i++) R(x + rnd() * w, y + rnd() * h, 5, 3, STONE[0]);
+  R(x, y, w, 1, STONE[0]);
+}
+function arch(x, y, w, h, glass = '#27384f') {
+  R(x - 1, y - 1, w + 2, h + 2, '#d9d5c9');
+  const half = Math.ceil(w / 2);
+  for (let r = 0; r < half; r++) { const inset = half - 1 - r; R(x + inset - 1, y - 1 + r - half + 1, w - 2 * inset + 2, 1, '#d9d5c9'); }
+  for (let r = 0; r < half; r++) { const inset = half - 1 - r; R(x + inset, y + r - half + 1, w - 2 * inset, 1, glass); }
+  R(x, y, w, h, glass); R(Math.floor(x + w / 2), y - half + 3, 1, h + half - 3, '#d9d5c9'); R(x + 1, y + 2, 1, 3, 'rgba(255,255,255,.35)');
+}
+function rect(x, y, w, h, glass = '#27384f') {
+  R(x - 1, y - 1, w + 2, h + 2, '#d9d5c9'); R(x, y, w, h, glass);
+  R(x + Math.floor(w / 2), y, 1, h, '#d9d5c9'); R(x, y + Math.floor(h / 2), w, 1, '#d9d5c9');
+}
+function roof(x, y, w, h) {
+  R(x - 2, y, w + 4, h, '#3d4656');
+  for (let yy = y + 3; yy < y + h; yy += 4) R(x - 2, yy, w + 4, 1, '#2f3745');
+  for (let xx = x; xx < x + w; xx += 7) R(xx, y + 2, 1, h - 2, 'rgba(0,0,0,.12)');
+  R(x - 2, y, w + 4, 2, '#5f6c82'); R(x - 2, y + h - 2, w + 4, 2, '#2f3745');
+}
+function dormer(cx, y) {
+  ashlar(cx - 6, y, 12, 12);
+  for (let r = 0; r < 8; r++) R(cx - 8 + r, y - 8 + r, 16 - 2 * r, 1, '#3d4656');
+  R(cx - 3, y + 2, 6, 8, '#27384f'); R(cx - 3, y + 2, 6, 1, '#d9d5c9'); R(cx, y + 2, 1, 8, '#d9d5c9');
+}
+function gable(px, top, w, h) {            // 대칭 박공 지붕
+  for (let r = 0; r < h; r++) { const inset = (h - 1 - r) * (w / 2 / h); R(px - 3 + inset, top + r, w + 6 - inset * 2, 1, r % 4 === 3 ? '#2f3745' : '#3d4656'); R(px - 3 + inset, top + r, 1, 1, '#5f6c82'); R(px + w + 2 - inset, top + r, 1, 1, '#2f3745'); }
+}
+function ivy(x, y, p, seed) { blob(x, y, 7, 6, p, seed, 4); }
+/* 고딕풍 석조 건물(정면도) */
+function gothicHall(x, w, base, floors, o = {}) {
+  const fh = 28, top = base - floors * fh;
+  shadow(x + w / 2, base + 3, w / 2 + 4, 3, 0.28);
+  roof(x, top - 28, w, 28);
+  const nd = Math.max(2, Math.floor(w / 32));
+  for (let i = 0; i < nd; i++) dormer(x + (w / nd) * (i + 0.5), top - 20);
+  ashlar(x, top, w, base - top);
+  for (let f = 0; f < floors; f++) R(x, top + f * fh, w, 2, STONE[0]);
+  const cols = Math.floor((w - 8) / 18);
+  for (let f = 0; f < floors; f++) for (let i = 0; i < cols; i++) {
+    const wx = x + 8 + i * 18 + (w - 8 - cols * 18) / 2, wy = top + f * fh + 8;
+    if (f === 0 && o.door && Math.abs(wx + 5 - (x + w / 2)) < 12) continue;
+    (f % 2 === 0) ? arch(wx, wy + 4, 8, 12) : rect(wx - 1, wy + 2, 10, 14);
+  }
+  if (o.gable) { const gx = o.gable; ashlar(gx, top - 12, 44, base - top + 12); gable(gx, top - 38, 44, 26); arch(gx + 11, top + 14, 9, 14); arch(gx + 26, top + 14, 9, 14); }
+  if (o.spire) { const sx = o.spireRight ? x + w - 26 : x + 4; ashlar(sx, top - 40, 22, 40); for (let r = 0; r < 24; r++) R(sx + 11 - (r * 0.46), top - 64 + r, r * 0.92 + 1, 1, '#3d4656'); arch(sx + 7, top - 30, 8, 12); }
+  if (o.door) { const dx = (o.gable ? o.gable + 22 : x + w / 2) - 11; R(dx - 2, base - 28, 26, 28, '#d9d5c9'); R(dx + 1, base - 25, 20, 25, '#5a3b25'); R(dx + 10, base - 25, 2, 25, '#3a2616'); R(dx + 5, base - 12, 2, 2, '#e3c26a'); R(dx + 15, base - 12, 2, 2, '#e3c26a'); R(dx - 4, base, 30, 3, STONE[0]); }
+  for (const [ix, iy, p] of [[x + 12, base - 6, CRIM], [x + w - 14, base - 4, MAPLE], [x + w * 0.45, base - 5, GREEN]]) ivy(ix, iy, p, ix * 3 + iy);
+}
+/* 현대식 건물(벽돌 + 유리) */
+function modern(x, y, w, h) {
+  shadow(x + w / 2, y + h + 3, w / 2 + 4, 3, 0.28);
+  R(x, y, w, h, '#a85a43'); for (let yy = y; yy < y + h; yy += 3) R(x, yy, w, 1, '#93493a');
+  R(x, y, w, 4, '#d9d5c9'); R(x, y + 4, w, 1, '#7a3a2c');
+  const cols = Math.floor((w - 10) / 22), rows = Math.floor((h - 26) / 26);
+  for (let r = 0; r < rows; r++) for (let i = 0; i < cols; i++) {
+    const wx = x + 6 + i * 22, wy = y + 12 + r * 26;
+    R(wx - 1, wy - 1, 20, 20, '#d9d5c9'); R(wx, wy, 18, 18, '#7fb0d0'); R(wx, wy, 18, 5, '#a8cfe6'); R(wx + 8, wy, 1, 18, '#d9d5c9'); R(wx, wy + 9, 18, 1, '#d9d5c9');
+  }
+  const gx = x + w / 2 - 22; R(gx, y + h - 24, 44, 24, '#5f8aa8'); R(gx, y + h - 24, 44, 4, '#bcd8e8'); R(gx + 21, y + h - 24, 2, 24, '#d9d5c9');
+  R(gx - 6, y + h - 28, 56, 4, CRIMSON); R(gx - 6, y + h - 24, 56, 1, CRIM[2]);
+  R(x + 6, y - 6, w - 12, 8, '#d9d5c9'); R(x + 6, y - 6, w - 12, 1, '#fff'); letters('KU', x + w / 2 - 6, y - 5, CRIMSON);
+}
+function tiger(x, y) {
+  const O = '#e49b2d', D = '#2a1a10', Wt = '#f6f0e0';
+  R(x + 4, y + 7, 17, 9, O); R(x + 5, y + 6, 15, 1, O);
+  R(x + 5, y + 15, 3, 5, O); R(x + 17, y + 15, 3, 5, O); R(x + 5, y + 19, 3, 1, Wt); R(x + 17, y + 19, 3, 1, Wt);
+  R(x + 7, y + 13, 11, 3, Wt);
+  R(x + 15, y + 1, 10, 9, O); R(x + 15, y, 2, 2, O); R(x + 23, y, 2, 2, O); R(x + 16, y, 1, 1, D); R(x + 24, y, 1, 1, D);
+  R(x + 19, y + 6, 6, 4, Wt); R(x + 18, y + 4, 2, 2, D); R(x + 23, y + 4, 2, 2, D); R(x + 21, y + 6, 2, 1, D);
+  R(x + 8, y + 7, 1, 5, D); R(x + 12, y + 7, 1, 6, D); R(x + 16, y + 7, 1, 4, D); R(x + 17, y + 1, 1, 2, D); R(x + 21, y + 1, 1, 2, D);
+  R(x + 1, y + 9, 4, 2, O); R(x, y + 6, 2, 4, O); R(x, y + 6, 2, 1, D); R(x + 2, y + 9, 1, 2, D);
+}
+function bench(x, y, w = 24) { R(x, y, w, 3, '#8a5a34'); R(x, y + 3, 2, 4, '#4a3020'); R(x + w - 2, y + 3, 2, 4, '#4a3020'); R(x, y - 4, w, 2, '#6f4627'); }
+function lamp(x, y) {
+  R(x, y - 26, 2, 26, '#2a2a32'); R(x - 3, y - 29, 8, 3, '#f2d27a'); R(x - 2, y - 30, 6, 1, '#fff2b8');
+  R(x + 2, y - 24, 8, 16, CRIMSON); R(x + 2, y - 10, 8, 2, CRIM[2]); R(x + 4, y - 20, 4, 1, '#fff'); R(x + 4, y - 17, 4, 1, '#fff'); R(x + 4, y - 14, 3, 1, '#fff');
+}
+function bikeRack(x, y) { for (let i = 0; i < 4; i++) { R(x + i * 6, y, 1, 6, '#55585f'); R(x + i * 6 - 1, y + 5, 3, 1, '#55585f'); } R(x, y, 19, 1, '#55585f'); R(x + 2, y - 3, 4, 3, '#2d6cdf'); R(x + 12, y - 3, 4, 3, CRIMSON); }
+function bin(x, y) { R(x, y, 5, 7, '#3f6f4a'); R(x - 1, y - 1, 7, 2, '#2a4a32'); R(x + 1, y + 2, 3, 1, '#9bc7a6'); }
+/* 학생(과잠) */
+function student(x, y, jacket = CRIMSON, o = {}) {
+  const skin = o.skin || '#f1c9a0', hair = o.hair || '#2b1d14';
+  shadow(x + 2, y + 11, 4, 1.5, 0.28);
+  R(x, y, 5, 3, hair); R(x + 1, y + 3, 3, 3, skin); R(x, y + 3, 1, 1, hair);
+  R(x - 1, y + 6, 7, 6, jacket); R(x - 1, y + 6, 7, 1, 'rgba(255,255,255,.25)');
+  if (jacket === CRIMSON) { R(x + 1, y + 8, 3, 1, '#fff'); R(x - 1, y + 6, 1, 6, '#f4efe2'); R(x + 5, y + 6, 1, 6, '#f4efe2'); }
+  R(x, y + 12, 2, 4, o.pants || '#2c3550'); R(x + 3, y + 12, 2, 4, o.pants || '#2c3550');
+  if (o.bag) R(x - 3, y + 7, 3, 6, o.bag);
+}
+
+
+function stoneGable(px, top, w, h) {
+  for (let r = 0; r < h; r++) {
+    const inset = (h - 1 - r) * (w / 2 / h);
+    R(px + inset, top + r, w - inset * 2, 1, r % 5 === 4 ? STONE[2] : STONE[1]);
+    R(px + inset - 1, top + r, 2, 1, '#3d4656'); R(px + w - inset - 1, top + r, 2, 1, '#2f3745');
+  }
+  for (let i = 0; i < w * h / 90; i++) R(px + w / 2 + (rnd() - 0.5) * w * 0.6, top + 6 + rnd() * (h - 8), 4, 2, STONE[0]);
+}
+const MOUND = ['#6aa653', '#4f8a3f', '#3b6e32', '#2b5226'];
+function mound(cx, cy, rx, ry, seed) { shadow(cx + 2, cy + ry * 0.75, rx * 0.95, ry * 0.45, 0.28); blob(cx, cy, rx, ry, MOUND, seed, 3); }
+const PINE = ['#4a7a42', '#34603a', '#244a2c', '#15301b'];
+function pine(x, y, seed) {
+  shadow(x + 2, y, 16, 4, 0.25);
+  R(x, y - 26, 3, 26, '#7a4526'); R(x, y - 26, 1, 26, '#94593a'); R(x + 1, y - 34, 3, 10, '#7a4526');
+  blob(x - 7, y - 28, 11, 5, PINE, seed, 4); blob(x + 9, y - 33, 10, 5, PINE, seed + 1, 4);
+  blob(x + 1, y - 40, 13, 6, PINE, seed + 2, 4); blob(x - 4, y - 49, 9, 5, PINE, seed + 3, 4); blob(x + 6, y - 52, 7, 4, PINE, seed + 4, 3);
+}
+
+/* 별관 A: 도서관풍 — 가파른 지붕 + 앞으로 튀어나온 중앙 박공 현관 */
+function libraryHall(x, w, base) {
+  const WARM = '#b9b3a6', fh = 28, top = base - 3 * fh, cx = x + w / 2;
+  shadow(cx, base + 3, w / 2 + 4, 3, 0.28);
+  roof(x, top - 36, w, 36);
+  for (const dx of [-52, 52]) { ashlar(cx + dx - 9, top - 22, 18, 22, WARM); gable(cx + dx - 9, top - 36, 18, 14); rect(cx + dx - 3, top - 15, 6, 8); }
+  ashlar(x, top, w, base - top, WARM);
+  for (let f = 0; f < 3; f++) R(x, top + f * fh, w, 2, STONE[0]);
+  const cols = 8;
+  for (let f = 0; f < 3; f++) for (let i = 0; i < cols; i++) {
+    const wx = x + 8 + i * ((w - 20) / (cols - 1)), wy = top + f * fh + 8;
+    if (Math.abs(wx + 4 - cx) < 24) continue;
+    f === 2 ? arch(wx, wy + 8, 8, 12) : rect(wx - 1, wy + 3, 10, 13);
+  }
+  // 중앙 현관 박공
+  const bw = 46, bx = cx - bw / 2;
+  ashlar(bx, top - 14, bw, base - top + 14, '#c3bdb0');
+  stoneGable(bx - 2, top - 44, bw + 4, 30);
+  R(bx - 2, top - 15, bw + 4, 3, STONE[0]);
+  arch(cx - 5, top - 8, 10, 22);                               // 큰 첨두아치 창
+  R(cx - 1, top - 30, 2, 8, '#d9dcde'); R(cx - 2, top - 33, 4, 3, '#d9dcde');   // 피니얼
+  rect(bx + 6, top + 14, 9, 12); rect(bx + bw - 15, top + 14, 9, 12);
+  R(bx + 5, base - 34, bw - 10, 34, '#d9dcde'); R(bx + 9, base - 30, bw - 18, 30, '#5a3b25');
+  for (let r = 0; r < 8; r++) { R(bx + 9 + r, base - 30 - 0, 1, 0, '#000'); }
+  R(cx - 1, base - 30, 2, 30, '#3a2616'); R(bx + 5, base, bw - 10, 3, STONE[0]);
+  R(bx + 12, base - 38, 3, 8, '#8a8f94'); R(bx + bw - 15, base - 38, 3, 8, '#8a8f94');
+  for (const [ix, iy, p] of [[x + 10, base - 6, MAPLE], [x + w - 12, base - 5, CRIM], [x + 40, base - 4, GREEN]]) ivy(ix, iy, p, ix * 3 + iy);
+}
+/* 별관 B: 성채풍 — 성가퀴 지붕선 + 모서리 원형 탑 + 1층 아케이드 */
+function castleHall(x, w, base) {
+  const COOL = '#a9aeb3', fh = 30, top = base - 4 * fh, cx = x + w / 2;
+  shadow(cx, base + 3, w / 2 + 4, 3, 0.28);
+  ashlar(x + 10, top, w - 20, base - top, COOL);
+  for (let f = 1; f < 4; f++) R(x + 10, top + f * fh, w - 20, 2, STONE[0]);
+  R(x + 8, top - 4, w - 16, 6, STONE[0]); R(x + 8, top + 1, w - 16, 2, STONE[2]);
+  for (let mx = x + 10; mx < x + w - 14; mx += 10) { R(mx, top - 11, 6, 8, STONE[0]); R(mx, top - 11, 6, 1, '#e6e9eb'); R(mx + 5, top - 11, 1, 8, STONE[2]); }
+  const cols = 7;
+  for (let f = 0; f < 3; f++) for (let i = 0; i < cols; i++) {
+    const wx = x + 22 + i * ((w - 50) / (cols - 1)), wy = top + f * fh + 9;
+    rect(wx, wy, 9, 14);
+  }
+  // 1층 아케이드
+  R(x + 10, base - 30, w - 20, 30, '#8f9499');
+  for (let i = 0; i < 5; i++) { const ax = x + 16 + i * ((w - 40) / 4); arch(ax, base - 14, 14, 14, '#23303f'); }
+  R(x + 10, base - 32, w - 20, 3, STONE[0]);
+  // 모서리 원형 탑(원뿔 지붕)
+  for (const tx of [x, x + w - 22]) {
+    ashlar(tx, top - 18, 22, base - top + 18, '#b3b8bd');
+    R(tx, top - 18, 4, base - top + 18, STONE[0]); R(tx + 18, top - 18, 4, base - top + 18, STONE[2]);
+    for (let r = 0; r < 26; r++) R(tx + 11 - r * 0.5 - 1, top - 44 + r, r * 1.0 + 4, 1, r % 4 === 3 ? '#2f3745' : '#3d4656');
+    R(tx + 10, top - 52, 2, 9, '#6a6a70'); R(tx + 12, top - 52, 7, 4, CRIMSON);
+    arch(tx + 7, top - 6, 8, 14); rect(tx + 6, top + 22, 10, 13); rect(tx + 6, top + 52, 10, 13);
+  }
+  for (const [ix, iy, p] of [[x + 40, base - 5, CRIM], [x + w - 44, base - 4, GREEN]]) ivy(ix, iy, p, ix * 5 + iy);
+}
+
+function tigerEmblem(cx, cy) {
+  const K = '#2a1408', O = '#f2ab2c', Y = '#ffd569', B = '#b8641a', Wt = '#f8f1e0', P = '#d9707a', E = '#fff3a0';
+  const widths = [8, 14, 18, 20, 22, 22, 22, 22, 22, 22, 22, 20, 18, 14, 8];       // 머리 윤곽(위→아래)
+  const top = cy - 9;
+  const M = (dx, y, w, h, col) => { R(cx + dx, y, w, h, col); R(cx - dx - w + 1, y, w, h, col); };   // 좌우 대칭
+  // 귀
+  for (const sg of [-1, 1]) { const ex = cx + sg * 9; disc(ex, top + 1, 4, K); disc(ex, top + 1, 3, O); disc(ex, top + 2, 1, K); }
+  // 머리 윤곽 + 털색
+  widths.forEach((w, i) => { R(cx - w / 2 - 1, top + 1 + i, w + 2, 1, K); });
+  widths.forEach((w, i) => { R(cx - w / 2, top + 1 + i, w, 1, i < 2 ? Y : O); });
+  R(cx - 9, top + 2, 18, 1, Y);                                                      // 이마 하이라이트
+  // 이마 王 무늬
+  R(cx - 1, top + 2, 2, 7, K); R(cx - 3, top + 3, 6, 1, K); R(cx - 4, top + 5, 8, 1, K);
+  M(6, top + 3, 2, 1, K); M(8, top + 5, 2, 1, K);
+  // 뺨 줄무늬
+  for (const dy of [7, 9, 11]) M(8 + (dy === 11 ? 1 : 0), top + dy, 3, 1, K);
+  // 눈썹 · 눈 (치켜뜬 눈)
+  M(3, top + 6, 5, 1, K); M(2, top + 7, 2, 1, K);
+  M(3, top + 8, 4, 2, E); M(3, top + 8, 4, 1, K); M(5, top + 9, 1, 2, K);
+  // 코 · 주둥이
+  R(cx - 5, top + 10, 10, 5, Wt); R(cx - 2, top + 9, 4, 2, P); R(cx - 1, top + 11, 2, 1, K);
+  R(cx, top + 11, 1, 2, K); M(1, top + 13, 3, 1, K);
+  M(2, top + 14, 1, 2, Wt); R(cx - 3, top + 15, 6, 1, K);                          // 송곳니 + 입
+  for (const dy of [11, 12]) M(5, top + dy, 1, 1, B);
+}
+function statue(cx, base) {
+  // 좌대
+  R(cx - 11, base - 2, 22, 4, '#a9aeb2'); R(cx - 9, base - 22, 18, 21, '#cdd1d4'); R(cx + 4, base - 22, 5, 21, '#a9aeb2');
+  R(cx - 10, base - 25, 20, 3, '#dfe2e4'); R(cx - 10, base - 23, 20, 1, '#8a9095'); R(cx - 4, base - 14, 8, 5, '#8a9095');
+  // 동상(청동 청록)
+  const B = '#3b6b58', L = '#5f9a82', Dk = '#25483a', y0 = base - 25 - 36;
+  shadow(cx + 2, base + 3, 14, 3, 0.3);
+  R(cx - 4, y0, 8, 8, Dk); R(cx - 3, y0 + 1, 6, 7, L);                                  // 머리
+  R(cx - 3, y0, 6, 2, Dk);
+  R(cx - 6, y0 + 9, 12, 18, B); R(cx - 6, y0 + 9, 3, 18, L); R(cx + 3, y0 + 9, 3, 18, Dk); // 코트
+  R(cx - 8, y0 + 10, 3, 14, B); R(cx + 5, y0 + 10, 3, 14, Dk);                              // 팔
+  R(cx - 4, y0 + 27, 4, 9, Dk); R(cx + 1, y0 + 27, 4, 9, B); R(cx - 5, y0 + 35, 5, 2, Dk); R(cx + 1, y0 + 35, 5, 2, Dk);
+  R(cx - 1, y0 + 9, 2, 12, '#9ec8b4');
+}
+
+/* ---------- 바닥: 광장 · 잔디 ---------- */
+for (let y = 0; y < H; y++) R(0, y, W, 1, (Math.floor(y / 14) % 2) ? GRASS[0] : GRASS[1]);
+for (let i = 0; i < 2000; i++) R(rnd() * W, rnd() * 236, 1, rnd() < 0.5 ? 2 : 1, rnd() < 0.5 ? GRASS[2] : GRASS[3]);
+// 뒷숲: 먼 산등성이(푸르스름) → 중간 숲 → 앞줄 숲(줄기 + 단풍)
+const HILL = ['#7fa98f', '#6d9a7f', '#5b8a70', '#3f6b57'];
+R(0, 0, W, 70, '#6d9a7f');
+for (let x = 0; x < W; x += 2) { const h = 14 + Math.sin(x / 41) * 6 + Math.sin(x / 17) * 3; R(x, 0, 2, h, '#86b09a'); }
+for (let i = 0; i < 500; i++) R(rnd() * W, rnd() * 70, 2, 1, rnd() < 0.5 ? '#5b8a70' : '#7fa98f');
+let fs = 100;
+const MIX = [DEEP, GREEN, DEEP, GREEN, GREEN];
+for (const [y, step, r0, tint] of [[18, 10, 11, 0.5], [32, 11, 13, 0.25], [46, 12, 15, 0.08]]) {
+  for (let x = -8; x < W + 12; x += step + Math.floor(rnd() * 5)) {
+    const pal = MIX[Math.floor(rnd() * MIX.length)];
+    blob(x, y + rnd() * 5, r0 * (1.0 + rnd() * 0.25), r0 * 0.95, pal, fs++, 9);
+    if (tint > 0.1) { c.fillStyle = `rgba(130,170,150,${tint * 0.55})`; c.fillRect(x - r0, y - r0, r0 * 2, r0 * 2); }
+  }
+}
+// 앞줄: 줄기가 보이고 은행/단풍이 섞인다
+const frontXs = [];
+for (let x = -4; x < W + 12; x += 15 + Math.floor(rnd() * 8)) frontXs.push(x);
+for (const x of frontXs) { R(x - 1, 56, 3, 14, '#4a3322'); R(x - 1, 56, 1, 14, '#6a4a30'); shadow(x + 2, 70, 7, 2, 0.3); }
+const frontTrees = frontXs.map((x) => { const q = rnd(); return { x, y: 56 + rnd() * 4, rx: 13 + rnd() * 5, ry: 12 + rnd() * 3, col: q < 0.14 ? GINKGO : q < 0.22 ? MAPLE : null, pal: q < 0.6 ? GREEN : DEEP }; });
+for (const t of frontTrees) if (!t.col) blob(t.x, t.y, t.rx, t.ry, t.pal, fs++, 9);
+for (const t of frontTrees) if (t.col) blob(t.x, t.y, t.rx, t.ry, t.col, fs++, 9);   // 단풍/은행은 맨 위(가려지지 않게)
+// 광장 포장 (본관 앞은 잔디 마당)
+const PY0 = 270;
+for (let y = PY0; y < SY - 9; y += 8) for (let x = ((y - PY0) / 8 % 2) * 8 - 16; x < W; x += 16) {
+  const k = Math.floor(rnd() * 3); R(x, y, 15, 7, PAVE[k === 2 ? 1 : k]); R(x, y + 7, 16, 1, PAVE[2]); R(x + 15, y, 1, 8, PAVE[2]);
+}
+R(0, PY0 - 2, W, 2, STONE[2]); R(0, PY0, W, 1, '#e8e2d2');
+for (const y of [PY0 + 5, SY - 26]) { R(0, y, W, 2, CRIM[1]); R(0, y + 2, W, 1, '#e8e2d2'); }
+// 본관 앞 보행축
+R(381, 240, 38, 30, '#d8d1c0'); for (let y = 240; y < 270; y += 4) R(381, y, 38, 1, '#bdb6a5'); R(379, 240, 2, 30, STONE[2]); R(419, 240, 2, 30, STONE[2]);
+// 중앙 메달리온 + 호랑이상
+const MX = 400, MY = 308;
+disc(MX, MY, 33, '#a9a398'); disc(MX, MY, 31, '#e3ddcf'); disc(MX, MY, 27, CRIMSON); disc(MX, MY, 24, '#e3ddcf');
+for (let a2 = 0; a2 < 360; a2 += 30) { const r = a2 * Math.PI / 180; R(MX + Math.cos(r) * 29 - 1, MY + Math.sin(r) * 29 - 1, 3, 3, '#e3ddcf'); }
+disc(MX, MY, 17, '#b6b0a4'); disc(MX, MY, 15, '#8d8a80'); disc(MX, MY, 13, '#a9a69c');
+shadow(MX + 2, MY + 3, 14, 4, 0.3);
+tiger(MX - 13, MY - 21);
+R(MX - 6, MY + 1, 14, 3, CRIMSON);
+
+/* ---------- 본관 줄 (뒤쪽 건물군) ---------- */
+const HB = 240;
+shadow(400, HB + 3, 250, 4, 0.28);
+libraryHall(14, 154, HB);
+castleHall(632, 156, HB);
+// 본관 앞 마당: 둥글게 다듬은 관목
+for (const side of [0, 1]) {
+  const m = (x) => side ? 800 - x : x;
+  for (const [x, yy, rx, ry, sd] of [[198, 251, 14, 9, 11], [232, 250, 15, 9, 12], [266, 251, 15, 9, 13], [300, 250, 14, 9, 14], [336, 251, 14, 9, 15], [216, 264, 17, 10, 16], [254, 265, 17, 10, 17], [292, 264, 17, 10, 18], [332, 265, 16, 10, 19]]) mound(m(x), yy, rx, ry, sd + side * 40);
+}
+// 본관: 날개동 (탑까지 이어 붙임)
+for (const wx of [200, 444]) {
+  const WW = 156;
+  roof(wx, 148, WW, 34);
+  for (let i = 0; i < 5; i++) dormer(wx + 16 + i * 31, 160);
+  ashlar(wx, 182, WW, HB - 182);
+  R(wx, 182, WW, 2, STONE[0]); R(wx, 208, WW, 2, STONE[0]);
+  for (let i = 0; i < 9; i++) rect(wx + 6 + i * 16, 192, 9, 11);
+  for (let i = 0; i < 9; i++) { if (i % 2 === 0) arch(wx + 7 + i * 16, 220, 8, 11); else rect(wx + 6 + i * 16, 216, 9, 13); }
+}
+// 양끝 석조 박공 건물
+for (const px of [172, 578]) {
+  ashlar(px, 160, 50, HB - 160); stoneGable(px, 126, 50, 34);
+  R(px - 2, 158, 54, 3, STONE[0]); R(px, 205, 50, 2, STONE[0]);
+  rect(px + 20, 140, 10, 9);
+  rect(px + 9, 172, 11, 12); rect(px + 30, 172, 11, 12);
+  rect(px + 9, 190, 11, 12); rect(px + 30, 190, 11, 12);
+  arch(px + 10, 222, 9, 11); arch(px + 31, 222, 9, 11);
+  R(px, 160, 4, HB - 160, STONE[0]); R(px + 46, 160, 4, HB - 160, STONE[2]);
+}
+// 중앙탑 (낮고 넓은 평면 + 성가퀴)
+const TW = 88, TX = 400 - TW / 2;
+ashlar(TX, 112, TW, HB - 112);
+R(TX, 112, 9, HB - 112, STONE[0]); R(TX + TW - 9, 112, 9, HB - 112, STONE[2]);
+R(TX + 9, 112, 1, HB - 112, STONE[2]); R(TX + TW - 10, 112, 1, HB - 112, STONE[0]);
+R(TX - 3, 102, TW + 6, 11, STONE[0]); R(TX - 3, 111, TW + 6, 2, STONE[2]);
+for (let x = TX - 3; x < TX + TW + 3; x += 11) { R(x, 94, 7, 9, STONE[0]); R(x, 94, 7, 1, '#e6e9eb'); R(x + 6, 94, 1, 9, STONE[2]); }
+R(TX, 118, TW, 2, STONE[0]);
+// 깃대 두 개
+R(TX + 18, 58, 2, 40, '#e8e8ea'); R(TX + 66, 58, 2, 40, '#e8e8ea');
+R(TX + 68, 60, 11, 7, '#c9272f'); R(TX + 68, 60, 11, 1, '#e5555c'); R(TX + 20, 60, 8, 5, '#f4f4f6');
+// 탑 아래 현관
+R(TX + 31, HB - 32, 26, 32, '#d9dcde'); R(TX + 34, HB - 29, 20, 29, '#4a3322'); R(TX + 43, HB - 29, 2, 29, '#2e1f14');
+for (const [dx, dy] of [[0, 0], [1, 0], [2, 0], [0, 1], [1, 1], [0, 2]]) { R(TX + 34 + dx, HB - 29 + dy, 1, 1, '#d9dcde'); R(TX + 53 - dx, HB - 29 + dy, 1, 1, '#d9dcde'); }
+// 크림슨 대형 현수막 + 호랑이 문양
+const BX = TX + 21, BW = 46, BT = 122, BB = 214;
+R(BX - 1, BT - 2, BW + 2, 3, '#4a4a52');
+R(BX, BT, BW, BB - BT, CRIMSON); R(BX, BT, 3, BB - BT, CRIM[0]); R(BX + BW - 3, BT, 3, BB - BT, CRIM[2]);
+for (const fx of [12, 24, 36]) R(BX + fx, BT + 2, 1, BB - BT - 4, CRIM[1]);
+R(BX, BB - 4, BW, 4, CRIM[2]);
+for (let x = BX; x < BX + BW; x += 3) R(x, BB, 1, 2, CRIM[2]);
+tigerEmblem(BX + BW / 2, BT + 12);
+// 담쟁이(몇 군데만)
+for (const [x, y, p] of [[207, 228, CRIM], [326, 232, GREEN], [470, 230, CRIM], [598, 226, GREEN]]) ivy(x, y, p, x * 7 + y);
+// 동상 + 좌대
+statue(400, HB + 14);
+// 소나무와 마당 나무
+pine(238, 264, 71); pine(562, 264, 83);
+tree(150, 258, GINKGO, 0.9, 301); tree(650, 258, GINKGO, 0.9, 311); tree(100, 262, MAPLE, 0.85, 305); tree(700, 262, MAPLE, 0.85, 317);
+
+/* ---------- 사무실 양옆 건물 ---------- */
+tree(132, 404, GINKGO, 1.0, 421); tree(668, 404, GINKGO, 1.0, 423); tree(60, 420, MAPLE, 0.95, 425); tree(740, 420, MAPLE, 0.95, 427);
+gothicHall(6, 142, 578, 4, { door: true, gable: 54 });
+gothicHall(652, 142, 584, 4, { door: true, gable: 701, spire: true, spireRight: true });
+// 오른쪽 건물: 현관 양옆 크림슨 현수막
+for (const bx of [686, 748]) { R(bx, 584 - 66, 8, 30, CRIMSON); R(bx, 584 - 38, 8, 2, CRIM[2]); R(bx + 1, 584 - 58, 6, 1, '#fff'); R(bx + 1, 584 - 55, 6, 1, '#fff'); }
+// 나무 · 소품
+bikeRack(124, 592); bikeRack(662, 596);
+bench(104, 366); bench(672, 366);
+bin(146, 330); bin(650, 330);
+// 깃대(크림슨)
+for (const fx of [262, 538]) { R(fx, 294, 2, 52, '#6a6a70'); R(fx + 2, 296, 24, 14, CRIMSON); R(fx + 2, 296, 24, 2, CRIM[0]); R(fx + 2, 308, 24, 2, CRIM[2]); letters('KU', fx + 8, 299, '#fff'); R(fx - 3, 344, 8, 3, STONE[1]); }
+// 안내판
+R(228, 322, 2, 26, '#4a3a2a'); R(212, 322, 34, 9, CRIMSON); R(212, 322, 34, 1, CRIM[0]); R(212, 331, 34, 1, CRIM[2]); R(212, 333, 34, 9, CRIM[1]); R(212, 333, 34, 1, CRIM[0]); R(212, 341, 34, 1, CRIM[2]);
+// 안내판 글씨는 합성 단계에서 덧씀
+
+/* ---------- 학생들 ---------- */
+const NAVY = '#2c3550', GRAY = '#7a7f8a';
+student(300, 326, CRIMSON, { bag: '#333' }); student(309, 327, CRIMSON, { hair: '#5b3a24', bag: '#b8860b' });
+student(352, 280, CRIMSON, { skin: '#e3b88c' }); student(361, 281, GRAY, { hair: '#1a1a1a' }); student(370, 280, CRIMSON, { hair: '#7a4a2a' });
+student(446, 282, NAVY, { hair: '#2b1d14', pants: '#e3dfd3' }); student(436, 328, CRIMSON, { bag: '#d94f4f' });
+student(494, 306, CRIMSON, { hair: '#1a1a1a' }); student(503, 306, CRIMSON, { hair: '#6a3a1a', bag: '#2b6cb0' });
+student(246, 292, GRAY, { hair: '#2b1d14' }); student(344, 296, CRIMSON, { hair: '#4a2a1a' });
+student(560, 322, CRIMSON, { bag: '#444' }); student(176, 318, NAVY, { hair: '#1a1a1a' });
+student(130, 330, CRIMSON, { hair: '#3a2a1a' }); student(620, 318, CRIMSON, { hair: '#2b1d14', bag: '#e0b72d' });
+student(700, 342, GRAY, { hair: '#2b1d14' }); student(146, 604, CRIMSON, { hair: '#6a3a1a' });
+// 벤치에 앉은 학생
+student(110, 356, CRIMSON, { hair: '#5b3a24' }); student(680, 356, GRAY, { hair: '#1a1a1a' });
+
+/* ---------- 도로 ---------- */
+R(0, SY - 9, W, 9, GREEN[1]); hedge(0, SY - 12, W, 9, GREEN, 61);
+for (let x = 0; x < W; x += 36) { R(x + 8, SY - 9, 3, 2, CRIM[0]); R(x + 20, SY - 8, 3, 2, CRIM[0]); R(x + 14, SY - 10, 2, 2, '#f6f0e0'); }
+function brick(y, h) { for (let yy = y; yy < y + h; yy += 3) for (let xx = (((yy - y) / 3) % 2) * 5; xx < W; xx += 10) R(xx, yy, 9, 2, ((xx / 10 | 0) + (yy / 3 | 0)) % 7 === 0 ? '#c9a09a' : '#bdb7ab'); }
+R(0, SY, W, 12, '#a39d92'); brick(SY, 12); R(0, SY + 10, W, 2, CRIM[1]);
+R(0, SY + 12, W, 4, '#6f717a');
+R(0, SY + 16, W, 36, '#4a4d56');
+for (let i = 0; i < 1800; i++) R(rnd() * W, SY + 16 + rnd() * 36, 1, 1, rnd() < 0.5 ? '#42454d' : '#555861');
+for (let x = 0; x < W; x += 24) R(x, SY + 34, 14, 2, '#e6e0cb');
+for (let y = SY + 17; y < SY + 52; y += 4) R(300, y, 16, 2, '#e6e0cb');
+R(0, SY + 52, W, 4, '#6f717a'); R(0, SY + 56, W, 12, '#a39d92'); brick(SY + 56, 12); R(0, SY + 56, W, 2, CRIM[1]);
+R(0, SY + 68, W, H - SY - 68, GRASS[1]);
+function bus(x, y) {
+  shadow(x + 36, y + 20, 38, 3, 0.35);
+  R(x, y, 76, 18, CRIMSON); R(x, y, 76, 2, CRIM[0]); R(x, y + 15, 76, 3, CRIM[2]);
+  for (let i = 0; i < 6; i++) R(x + 5 + i * 11, y + 3, 8, 5, '#cfe3f0');
+  R(x + 66, y + 3, 8, 7, '#cfe3f0'); R(x + 74, y + 11, 2, 4, '#f2d27a'); R(x, y + 9, 76, 1, CRIM[2]);
+  letters('KU', x + 32, y + 10, '#fff');
+  for (const wx of [x + 10, x + 56]) { R(wx, y + 14, 9, 7, '#1b1b20'); R(wx + 2, y + 16, 5, 3, '#8a8a92'); }
+}
+bus(540, SY + 20);
+R(140, SY + 38, 22, 7, '#e8e4d8'); R(144, SY + 35, 12, 4, '#cfe3f0'); R(141, SY + 44, 5, 3, '#1b1b20'); R(156, SY + 44, 5, 3, '#1b1b20');
+for (const x of [60, 220, 380, 520, 680]) lamp(x, SY + 62);
+// 정문 석주 + 현판
+function pillar(x, y) { ashlar(x, y, 14, 52); R(x - 2, y - 4, 18, 6, STONE[0]); R(x - 2, y + 1, 18, 1, STONE[2]); R(x - 3, y + 48, 20, 6, STONE[0]); R(x + 2, y + 10, 10, 6, CRIMSON); }
+shadow(60, SY - 14, 48, 4, 0.25);
+pillar(12, SY - 66); pillar(94, SY - 66);
+R(26, SY - 60, 68, 18, '#d9d5c9'); R(28, SY - 58, 64, 14, '#f3efe4'); R(26, SY - 44, 68, 2, STONE[2]);
+
+/* ---------- 낙엽 ---------- */
+for (let i = 0; i < 220; i++) {
+  const x = rnd() * W, y = 90 + rnd() * 560;
+  if (x > OX && x < OX + 493 && y > OY && y < OY + 297) continue;
+  R(x, y, 2, 1, rnd() < 0.5 ? '#e0b72d' : rnd() < 0.5 ? '#bf3b2a' : '#c23a58');
+}
+
+/* ---------- 합성 ---------- */
+const hi = document.getElementById('hi'), g = hi.getContext('2d');
+g.imageSmoothingEnabled = false;
+g.drawImage(lo, 0, 0, W * 2, H * 2);
+const img = new Image();
+img.onload = () => {
+  const dx = OX * 2, dy = OY * 2, sw = 982, sh = 594;
+  g.fillStyle = 'rgba(0,0,0,.28)'; g.fillRect(dx + 6, dy + 8, sw, sh);
+  g.drawImage(img, 470, 138, sw, sh, dx, dy, sw, sh);
+  g.strokeStyle = CRIMSON; g.lineWidth = 4; g.strokeRect(dx - 2, dy - 2, sw + 4, sh + 4);
+  const T = (txt, x, y, size, col, bold = true) => { g.font = `${bold ? 'bold ' : ''}${size}px "Malgun Gothic", sans-serif`; g.textAlign = 'center'; g.fillStyle = col; g.fillText(txt, x, y); };
+  T('고려대학교', 120, SY * 2 - 98, 15, CRIMSON);
+  T('본관 ▲', 458, 322 * 2 + 14, 11, '#fff');
+  T('정문 ▼', 458, 333 * 2 + 14, 11, '#fff');
+  T('중앙광장', MX * 2, (MY + 39) * 2, 13, CRIMSON);
+  g.fillStyle = 'rgba(18,21,29,.86)'; g.fillRect(14, 14, 372, 56);
+  g.fillStyle = CRIMSON; g.fillRect(14, 14, 6, 56);
+  g.textAlign = 'left'; g.fillStyle = '#fff'; g.font = 'bold 19px "Malgun Gothic", sans-serif'; g.fillText('Habblaud · KU Edition 시안 v6', 32, 38);
+  g.fillStyle = '#c9ced8'; g.font = '14px "Malgun Gothic", sans-serif'; g.fillText('교내 전경 컨셉 (가운데 사무실은 그대로)', 32, 59);
+  document.title = 'done';
+};
+img.src = 'mock.png';
+</script></body></html>

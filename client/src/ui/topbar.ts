@@ -138,7 +138,7 @@ export class TopBar implements UiComponent {
           'div',
           { class: 'ui-brand' },
           mark,
-          h('div', { class: 'ui-brand__text' }, wordmark(), h('div', { class: 'ui-topbar__status' }, this.pill, this.version.el, this.demoBadge)),
+          h('div', { class: 'ui-brand__text' }, wordmark(), h('div', { class: 'ui-topbar__status' }, this.pill, h('span', { class: 'ui-ku-badge', text: 'KU Edition' }), this.version.el, this.demoBadge)),
         ),
       ),
       counterWrap,
