@@ -1,7 +1,7 @@
 // Pessoas e ônibus do campus "KU Edition": estudantes e moradores que passeiam pela praça, pelos gramados e pelas calçadas,
 // entram e saem dos edifícios, sentam e levantam dos bancos, atravessam a rua na faixa de pedestres e pegam o ônibus.
 // O mapa de caminhada vem de ku.ts (KuMap); o renderer chama update() a cada quadro e desenha tudo junto, ordenado por y.
-import { findPath, type KuBench, type KuDoor, type KuMap, type Pt } from './ku-map';
+import { findPath, type BusStop, type KuBench, type KuDoor, type KuMap, type Pt } from './ku-map';
 import { BUS_KINDS, busLength, type BusKind } from './ku-traffic';
 
 export { BUS_KINDS, busLength };
@@ -319,7 +319,7 @@ type Goal =
   | { k: 'point'; x: number; y: number; pause: number }
   | { k: 'door'; door: KuDoor }
   | { k: 'bench'; bench: KuBench }
-  | { k: 'bus' }
+  | { k: 'bus'; stop: BusStop }
   | { k: 'leave'; x: number; y: number };
 
 type State = 'walk' | 'idle' | 'enter' | 'exitDoor' | 'sitDown' | 'seated' | 'standUp' | 'waitBus' | 'toBus' | 'fade' | 'alight';
@@ -373,7 +373,7 @@ export class KuPeople {
   private spawnT = 0;
   private target: number;
   private seats = new Set<string>();
-  private dwell: { x: number; y: number } | null = null;
+  private dwell: { x: number; y: number; dir: 1 | -1 }[] = [];
   private phase = false;
 
   constructor(
@@ -440,8 +440,8 @@ export class KuPeople {
           goals.push({ k: 'door', door: this.pick(doors) });
           ended = true;
         }
-      } else if (r < 0.9 && i === legs - 1) {
-        goals.push({ k: 'bus' });
+      } else if (r < 0.9 && i === legs - 1 && m.busStops.length) {
+        goals.push({ k: 'bus', stop: this.pick(m.busStops) });
         ended = true;
       } else if (m.pois.length) {
         const p = this.pick(m.pois);
@@ -460,7 +460,7 @@ export class KuPeople {
     if (this.rnd() < 0.3 && m.doors.length) {
       // sai de um edifício
       const door = this.pick(m.doors);
-      const station = door.id === 'station';
+      const station = door.id.startsWith('station');
       const kind: Kind = station ? (this.rnd() < 0.4 ? 'student' : this.rnd() < 0.5 ? 'worker' : 'citizen') : this.rnd() < 0.7 ? 'student' : this.rnd() < 0.4 ? 'worker' : 'citizen';
       const w = this.makeWalker(door.x, door.y - 6, kind);
       w.state = 'exitDoor';
@@ -483,20 +483,22 @@ export class KuPeople {
   }
 
   /** Um ônibus parou no ponto: desce gente (quem espera embarca; ver `dwell` em update). */
-  busArrived(doorX: number, laneY: number): void {
+  busArrived(doorX: number, laneY: number, dir: 1 | -1 = -1): void {
+    const stop = this.map.busStops.find((s) => s.dir === dir) ?? this.map.busStops[0];
+    if (!stop) return;
     const n = Math.floor(this.rnd() * 4);
     for (let k = 0; k < n; k++) {
-      const w = this.makeWalker(doorX + (this.rnd() - 0.5) * 10, laneY + 6, this.rnd() < 0.45 ? 'student' : this.rnd() < 0.15 ? 'elder' : 'citizen');
+      const w = this.makeWalker(doorX + (this.rnd() - 0.5) * 10, laneY + (dir > 0 ? -6 : 6), this.rnd() < 0.45 ? 'student' : this.rnd() < 0.15 ? 'elder' : 'citizen');
       w.alpha = 1;
       w.state = 'alight';
-      w.direct = { x: this.map.busStop.x + (this.rnd() - 0.5) * 20, y: this.map.busStop.y };
+      w.direct = { x: stop.x + (this.rnd() - 0.5) * 20, y: stop.y };
       w.goals = this.plan();
       this.walkers.push(w);
       this.stats.alighted++;
     }
   }
 
-  update(dt: number, vehicles: VehicleInfo[], dwell: { x: number; y: number } | null, peoplePhase = true): void {
+  update(dt: number, vehicles: VehicleInfo[], dwell: { x: number; y: number; dir: 1 | -1 }[], peoplePhase = true): void {
     dt = Math.min(dt, 0.1);
     this.dwell = dwell;
     this.phase = peoplePhase;
@@ -559,7 +561,7 @@ export class KuPeople {
       let target: Pt | null = null;
       if (g.k === 'point' || g.k === 'leave') target = { x: g.x, y: g.y };
       else if (g.k === 'door') target = { x: g.door.x, y: g.door.y };
-      else if (g.k === 'bus') target = this.map.busStop;
+      else if (g.k === 'bus') target = g.stop;
       else if (g.k === 'bench') {
         const seat = this.freeSeat(g.bench);
         if (!seat) continue;
@@ -729,8 +731,10 @@ export class KuPeople {
       case 'waitBus':
         w.waitT += dt;
         w.frame = 0;
-        if (this.dwell) {
-          w.direct = { x: this.dwell.x + (this.rnd() - 0.5) * 8, y: this.dwell.y + 6 };
+        const stop = w.cur && w.cur.k === 'bus' ? w.cur.stop : null;
+        const bus = stop ? this.dwell.find((d) => d.dir === stop.dir) : undefined;
+        if (bus) {
+          w.direct = { x: bus.x + (this.rnd() - 0.5) * 8, y: bus.y + (bus.dir > 0 ? -6 : 6) };
           w.state = 'toBus';
         } else if (w.waitT > 45) {
           w.goals = this.plan().filter((g) => g.k !== 'bus');
@@ -777,7 +781,7 @@ export class KuPeople {
               w.crossOk = true;
               w.waitT = 0;
               this.stats.crossings++;
-              if (this.dwell) this.stats.crossingsDuringDwell++;
+              if (this.dwell.length) this.stats.crossingsDuringDwell++;
             } else target = e;
           }
         }

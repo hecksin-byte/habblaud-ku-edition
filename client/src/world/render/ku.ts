@@ -452,39 +452,48 @@ function renderScene(g: KuGeometry): KuScene {
       for (let k = 0; k < 3; k++) R(x + w - 8, top - 12 + k * 4, 4, 2, '#fff');
     }
   }
+  /** Saída da estação Anam (linha 6) na calçada: escada que desce, cobertura de vidro e o pilar com o disco "6". */
   function subwayEntrance(x: number, base: number) {
     shadow(x + 24, base + 2, 30, 3, 0.25);
-    R(x, base - 22, 48, 22, '#9a958b');
-    for (let i = 0; i < 6; i++) R(x + 5, base - 20 + i * 3, 38, 2, i % 2 ? '#6b675f' : '#80796e');
-    R(x + 2, base - 24, 3, 24, '#26262c');
-    R(x + 43, base - 24, 3, 24, '#26262c');
-    R(x - 2, base - 38, 52, 5, '#3a3f48');
-    R(x - 2, base - 38, 52, 1, '#6a727e');
-    R(x + 4, base - 34, 2, 12, '#3a3f48');
-    R(x + 42, base - 34, 2, 12, '#3a3f48');
-    R(x + 52, base - 44, 6, 44, '#d9d4c7');
-    disc(x + 55, base - 36, 6, '#c9792f');
-    R(x + 53, base - 38, 5, 1, '#fff');
-    R(x + 53, base - 35, 5, 1, '#fff');
-    R(x + 53, base - 38, 1, 4, '#fff');
-    R(x + 53, base - 34, 5, 1, '#fff');
-    R(x + 57, base - 35, 1, 3, '#fff');
-    R(x + 50, base - 19, 10, 8, '#c9792f');
-    R(x + 52, base - 17, 6, 1, '#fff');
-    R(x + 52, base - 15, 6, 1, '#fff');
+    R(x, base - 14, 48, 14, '#9a958b');
+    R(x, base - 14, 48, 2, '#b9b4aa');
+    R(x + 8, base - 12, 32, 11, '#1b1b21');
+    for (let i = 0; i < 4; i++) R(x + 8, base - 10 + i * 3, 32, 1, i % 2 ? '#3a3a44' : '#2a2a32');
+    R(x + 5, base - 15, 2, 9, '#26262c');
+    R(x + 41, base - 15, 2, 9, '#26262c');
+    R(x + 2, base - 26, 3, 14, '#26262c');
+    R(x + 43, base - 26, 3, 14, '#26262c');
+    R(x - 2, base - 28, 52, 4, '#3a3f48');
+    R(x - 2, base - 28, 52, 1, '#6a727e');
+    R(x, base - 24, 48, 7, '#a8d0e0');
+    R(x, base - 24, 48, 2, '#e8f4fa');
+    R(x + 52, base - 38, 6, 38, '#d9d4c7');
+    R(x + 52, base - 38, 1, 38, '#f2eee3');
+    disc(x + 55, base - 30, 6, '#c9792f');
+    // "6" em 3x5 pixels
+    R(x + 54, base - 33, 3, 1, '#fff');
+    R(x + 54, base - 33, 1, 5, '#fff');
+    R(x + 54, base - 31, 3, 1, '#fff');
+    R(x + 56, base - 31, 1, 3, '#fff');
+    R(x + 54, base - 29, 3, 1, '#fff');
+    R(x + 50, base - 14, 10, 8, '#c9792f');
+    R(x + 52, base - 12, 6, 1, '#fff');
+    R(x + 52, base - 10, 6, 1, '#fff');
   }
+  /** Ponto de ônibus na calçada: cobertura baixa de vidro com banco e a placa azul do ponto. */
   function busStop(x: number, base: number) {
     shadow(x + 18, base + 2, 22, 3, 0.25);
-    R(x, base - 26, 3, 26, '#3a3f48');
-    R(x + 33, base - 26, 3, 26, '#3a3f48');
-    R(x - 2, base - 30, 40, 5, '#4f5662');
-    R(x + 3, base - 24, 30, 16, '#a8d0e0');
-    R(x + 3, base - 24, 30, 2, '#e8f4fa');
-    R(x + 6, base - 8, 24, 3, '#8a5a34');
-    R(x + 42, base - 40, 2, 40, '#3a3f48');
-    R(x + 38, base - 46, 10, 8, '#2c5aa0');
-    R(x + 40, base - 44, 6, 3, '#fff');
-    R(x + 40, base - 40, 6, 1, '#fff');
+    R(x, base - 20, 3, 20, '#3a3f48');
+    R(x + 33, base - 20, 3, 20, '#3a3f48');
+    R(x - 2, base - 24, 40, 4, '#4f5662');
+    R(x - 2, base - 24, 40, 1, '#8a929e');
+    R(x + 3, base - 19, 30, 12, '#a8d0e0');
+    R(x + 3, base - 19, 30, 2, '#e8f4fa');
+    R(x + 6, base - 7, 24, 3, '#8a5a34');
+    R(x + 42, base - 36, 2, 36, '#3a3f48');
+    R(x + 38, base - 42, 10, 8, '#2c5aa0');
+    R(x + 40, base - 40, 6, 3, '#fff');
+    R(x + 40, base - 36, 6, 1, '#fff');
   }
 
 
@@ -942,31 +951,39 @@ function renderScene(g: KuGeometry): KuScene {
   }
   R(0, southA, LW, 2, STONE[2]);
   const shopBase = LH - 8;
-  const stationX = Math.round(cxA + 190);
+  // Anam: duas saídas da estação (linha 6) e dois pontos de ônibus, um em cada calçada da pista. O ônibus que vai para
+  // leste para na calçada norte (lado do campus) e o que vai para oeste, na sul, sempre depois da faixa de pedestres.
+  const stationX = Math.round(cxA + 150);
+  const stationNX = Math.round(cxA - 290);
   const busX = Math.round(cxA - 230);
+  const busNX = Math.round(cxA + 230);
+  // As calçadas têm só ~16 px de arte: as coberturas ficam no fundo delas (junto às lojas ou à cerca viva), e as
+  // pessoas esperam e entram na frente, do lado da pista.
+  const stBaseS = sY1 + 8;
+  const busBaseS = sY1 + 8;
+  const stBaseN = sidewalkA + 8;
+  const busBaseN = sidewalkA + 8;
   let sx2 = -4;
   let si = 0;
   while (sx2 < LW) {
     const sw = 44 + Math.floor(rnd() * 28);
     const sh = 44 + Math.floor(rnd() * 26);
     const idx = si++;
-    const hitsStation = sx2 + sw > stationX - 6 && sx2 < stationX + 66;
-    const hitsBus = sx2 + sw > busX - 6 && sx2 < busX + 52;
-    if (!hitsStation && !hitsBus) {
-      const x0s = sx2;
-      side.put(southA + 8, () => shop(x0s, sw, sh, shopBase, idx));
-    }
+    const x0s = sx2;
+    side.put(southA + 8, () => shop(x0s, sw, sh, shopBase, idx));
     sx2 += sw + 2;
   }
-  openA(stationX - 2, southA, stationX + 60, shopBase - 12); // a boca da estação fica acessível
-  addDoor('station', stationX + 24, shopBase - 14);
-  side.put(southA + 10, () => subwayEntrance(stationX, shopBase));
-  side.put(southA + 10, () => busStop(busX, shopBase));
+  for (const [sx, base, did] of [[stationX, stBaseS, 'station'], [stationNX, stBaseN, 'station-n']] as [number, number, string][]) {
+    side.put(base, () => subwayEntrance(sx, base), dyn(sx + 30, 72, 52, [-30, -9, 18, -3]));
+    addDoor(did, sx + 24, base + 7);
+  }
+  for (const [bx, base] of [[busX, busBaseS], [busNX, busBaseN]] as [number, number][]) {
+    side.put(base, () => busStop(bx, base), dyn(bx + 22, 56, 48, null));
+  }
   let ti = 0;
   for (let x = 30; x < LW - 10; x += 70 + Math.floor(rnd() * 20), ti++) {
     const ty = LH - 4;
     const pal = [GINKGO, GINKGO, MAPLE, GINKGO][ti % 4];
-    if ((x > stationX - 14 && x < stationX + 74) || (x > busX - 14 && x < busX + 56)) continue;
     side.put(ty, () => tree(x, ty, pal, 0.78, 600 + ti), dyn(x));
   }
   side.put(LH, () => hedge(0, LH - 9, LW, 8, GREEN, 81));
@@ -1012,7 +1029,10 @@ function renderScene(g: KuGeometry): KuScene {
     doors,
     benches,
     crossing: { x0: WX(cxA - 16), x1: WX(cxA + 16), y0: g.streetY0, y1: g.streetY1 },
-    busStop: { x: WX(busX + 18), y: WY(sY1 + 8) },
+    busStops: [
+      { x: WX(busX + 18), y: WY(busBaseS + 5), dir: -1 },
+      { x: WX(busNX + 18), y: WY(busBaseN + 5), dir: 1 },
+    ],
     portals,
     pois,
   };

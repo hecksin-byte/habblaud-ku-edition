@@ -3,7 +3,7 @@
 // ocupantes, ninguém andando por onde não dá) e as combinações pedidas: atravessar com ônibus parado, fila chegando à
 // faixa, entrar e sair de edifícios, sentar e levantar, embarcar e desembarcar.
 import { describe, expect, it } from 'vitest';
-import { findPath, nearestWalkable, walkable, type KuMap } from './ku-map';
+import { findPath, nearestWalkable, walkable, type BusStop, type KuMap } from './ku-map';
 import { KuPeople, type VehicleInfo } from './ku-people';
 import { KuTraffic, halfLen, peoplePhase, type Car, type TrafficEnv } from './ku-traffic';
 
@@ -24,7 +24,8 @@ const H = 560;
 interface TestWorld {
   map: KuMap;
   lanes: { y: number; dir: 1 | -1 }[];
-  busStopX: number;
+  /** Um ponto em cada calçada: o sul atende a pista que vai para oeste, o norte a que vai para leste. */
+  busStops: BusStop[];
 }
 
 /** Mundo de teste: praça ao norte (com um edifício e bancos), calçada, rua de duas pistas com faixa de pedestres, calçada sul. */
@@ -70,6 +71,10 @@ function makeWorld(busStopX: number): TestWorld {
     { x: 600, y: 400 },
     { x: 300, y: 400 },
   ];
+  const busStops: BusStop[] = [
+    { x: busStopX, y: streetY1 + 14, dir: -1 },
+    { x: W - busStopX, y: streetY0 - 10, dir: 1 },
+  ];
   const map: KuMap = {
     cell: CELL,
     ox: 0,
@@ -80,11 +85,11 @@ function makeWorld(busStopX: number): TestWorld {
     doors,
     benches,
     crossing: cross,
-    busStop: { x: busStopX, y: streetY1 + 14 },
+    busStops,
     portals,
     pois,
   };
-  return { map, lanes: [{ y: 300, dir: 1 }, { y: 342, dir: -1 }], busStopX };
+  return { map, lanes: [{ y: 300, dir: 1 }, { y: 342, dir: -1 }], busStops };
 }
 
 interface Report {
@@ -98,6 +103,8 @@ interface Report {
   maxSeated: number;
   maxQueueOnCross: number;
   busesStopped: number;
+  /** Sentidos das pistas em que algum ônibus parou num ponto (os dois pontos precisam ser atendidos). */
+  stopDirs: Set<number>;
 }
 
 function simulate(world: TestWorld, seed: number, seconds: number): { report: Report; people: KuPeople; traffic: KuTraffic } {
@@ -105,8 +112,8 @@ function simulate(world: TestWorld, seed: number, seconds: number): { report: Re
   const traffic = new KuTraffic(rnd);
   const people = new KuPeople(world.map, W * 2, rnd);
   const cross = world.map.crossing;
-  const env = (crowded: boolean): TrafficEnv => ({ lanes: world.lanes, x0: -40, x1: W + 40, crossing: { x0: cross.x0, x1: cross.x1 }, crowded, busStopX: world.busStopX });
-  const rep: Report = { maxCarOverlap: 0, carWalkerHits: 0, boxBlockSeconds: 0, maxStationary: 0, maxWalkerAge: 0, walkersInBlocked: 0, seatConflicts: 0, maxSeated: 0, maxQueueOnCross: 0, busesStopped: 0 };
+  const env = (crowded: boolean): TrafficEnv => ({ lanes: world.lanes, x0: -40, x1: W + 40, crossing: { x0: cross.x0, x1: cross.x1 }, crowded, busStops: world.busStops.map((s) => ({ x: s.x, dir: s.dir })) });
+  const rep: Report = { maxCarOverlap: 0, carWalkerHits: 0, boxBlockSeconds: 0, maxStationary: 0, maxWalkerAge: 0, walkersInBlocked: 0, seatConflicts: 0, maxSeated: 0, maxQueueOnCross: 0, busesStopped: 0, stopDirs: new Set() };
   const stationary = new WeakMap<Car, number>();
   const seenStopped = new WeakSet<Car>();
   const dt = 1 / 20;
@@ -115,7 +122,7 @@ function simulate(world: TestWorld, seed: number, seconds: number): { report: Re
   for (let step = 0; step < seconds / dt; step++) {
     now += dt * 1000;
     const phase = peoplePhase(now);
-    traffic.update(now, dt, env(people.onCrossing(phase)), (x, y) => people.busArrived(x, y));
+    traffic.update(now, dt, env(people.onCrossing(phase)), (x, y, dir) => people.busArrived(x, y, dir));
     people.update(dt, infos(), traffic.dwelling, phase);
     // invariantes de veículos
     const byLane = new Map<number, Car[]>();
@@ -124,6 +131,7 @@ function simulate(world: TestWorld, seed: number, seconds: number): { report: Re
       if (c.bus && c.stopped && !seenStopped.has(c)) {
         seenStopped.add(c);
         rep.busesStopped++;
+        rep.stopDirs.add(c.dir);
       }
       const stuck = c.speed < 0.5 && !(c.stopped && c.dwell > 0);
       const t = stuck ? (stationary.get(c) ?? 0) + dt : 0;
@@ -233,6 +241,7 @@ describe('trânsito e pedestres juntos', () => {
     const world = makeWorld(380);
     let crossingsDuringDwell = 0;
     let busesStopped = 0;
+    const stopDirs = new Set<number>();
     let boarded = 0;
     let alighted = 0;
     let sat = 0;
@@ -242,6 +251,7 @@ describe('trânsito e pedestres juntos', () => {
       const { report, people } = simulate(world, seed * 104729, 1800);
       crossingsDuringDwell += people.stats.crossingsDuringDwell;
       busesStopped += report.busesStopped;
+      report.stopDirs.forEach((d) => stopDirs.add(d));
       boarded += people.stats.boarded;
       alighted += people.stats.alighted;
       sat += people.stats.sat;
@@ -253,6 +263,7 @@ describe('trânsito e pedestres juntos', () => {
       expect(report.seatConflicts).toBe(0);
     }
     expect(busesStopped).toBeGreaterThan(5);
+    expect([...stopDirs].sort()).toEqual([-1, 1]); // o ponto da calçada sul (oeste) e o da norte (leste)
     expect(crossingsDuringDwell).toBeGreaterThan(0); // atravessaram com um ônibus parado no ponto
     expect(boarded).toBeGreaterThan(0);
     expect(alighted).toBeGreaterThan(0);
@@ -267,7 +278,7 @@ describe('trânsito e pedestres juntos', () => {
     const people = new KuPeople(world.map, W * 2, mulberry32(5));
     const cross = world.map.crossing;
     const veh = (): VehicleInfo[] => [{ x: (cross.x0 + cross.x1) / 2, y: 300, halfLen: 18, moving: true }];
-    for (let i = 0; i < 20 * 120; i++) people.update(1 / 20, veh(), null, false);
+    for (let i = 0; i < 20 * 120; i++) people.update(1 / 20, veh(), [], false);
     expect(Math.max(0, ...people.walkers.map((w) => w.waitT))).toBeLessThanOrEqual(25.1);
   });
 });

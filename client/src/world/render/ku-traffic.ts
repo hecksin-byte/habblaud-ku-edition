@@ -30,8 +30,8 @@ export interface TrafficEnv {
   /** Faixa de pedestres (px de mundo, em x) e se há gente nela. */
   crossing: { x0: number; x1: number } | null;
   crowded: boolean;
-  /** Ponto de ônibus (x) ou null. */
-  busStopX: number | null;
+  /** Pontos de ônibus: x da cobertura e sentido da pista que para ali. */
+  busStops: { x: number; dir: 1 | -1 }[];
 }
 
 export const halfLen = (c: Car): number => c.half;
@@ -43,13 +43,13 @@ export const peoplePhase = (nowMs: number): boolean => (nowMs / 1000) % CROSSING
 
 export class KuTraffic {
   cars: Car[] = [];
-  /** Ônibus parado no ponto agora (para quem espera embarcar). */
-  dwelling: { x: number; y: number } | null = null;
+  /** Ônibus parados num ponto agora (para quem espera embarcar). */
+  dwelling: { x: number; y: number; dir: 1 | -1 }[] = [];
   private nextCarAt = 0;
 
   constructor(private readonly rnd: () => number = Math.random) {}
 
-  update(now: number, dt: number, env: TrafficEnv, onBusArrived: (x: number, y: number) => void): void {
+  update(now: number, dt: number, env: TrafficEnv, onBusArrived: (x: number, y: number, dir: 1 | -1) => void): void {
     const step = Math.min(dt, 0.1);
     if (now >= this.nextCarAt) {
       this.nextCarAt = now + 3500 + this.rnd() * 7500;
@@ -64,27 +64,29 @@ export class KuTraffic {
         }
       }
     }
-    let dwelling: Car | null = null;
+    const dwelling: Car[] = [];
+    const stopOf = (c: Car) => (c.bus ? env.busStops.find((s) => s.dir === c.dir) : undefined);
     const cross = env.crossing;
     for (const car of this.cars) {
       const half = halfLen(car);
-      // parada no ponto: ônibus da pista de baixo (sentido oeste) para, deixa e pega passageiros
-      if (car.bus && env.busStopX !== null && car.dir < 0 && car.dwell >= 0) {
-        const target = env.busStopX + 8;
-        const dist = car.x - target;
+      // parada no ponto: o ônibus da pista rente à calçada do ponto para, deixa e pega passageiros
+      const stop = stopOf(car);
+      if (stop && car.dwell >= 0) {
+        const target = stop.x - car.dir * 8;
+        const dist = (target - car.x) * car.dir;
         if (car.dwell === 0 && dist > 0 && dist < 70) car.speed = Math.min(car.speed, Math.max(6, car.cruise * (dist / 70)));
         if (car.dwell === 0 && dist <= 0) {
           car.x = target;
           car.stopped = true;
           car.speed = 0;
           car.dwell = 5 + this.rnd() * 3;
-          onBusArrived(target, car.y);
+          onBusArrived(target, car.y, car.dir);
         }
       }
       if (car.stopped) {
         if (car.dwell > 0) {
           car.dwell -= step;
-          dwelling = car;
+          dwelling.push(car);
           if (car.dwell <= 0) {
             car.stopped = false;
             car.dwell = -1;
@@ -118,9 +120,31 @@ export class KuTraffic {
           const leadRear = lead.x - lead.dir * halfLen(lead);
           const room = (leadRear - zEnd) * car.dir;
           // o da frente está parado, devagar ou prestes a parar no ponto de ônibus
-          const leadToStop = lead.bus && lead.dir < 0 && env.busStopX !== null && lead.dwell === 0 && lead.x - (env.busStopX + 8) > -2 && lead.x - (env.busStopX + 8) < 150;
+          const leadStop = stopOf(lead);
+          const leadDist = leadStop ? (leadStop.x - lead.dir * 8 - lead.x) * lead.dir : 0;
+          const leadToStop = !!leadStop && lead.dwell === 0 && leadDist > -2 && leadDist < 150;
           const leadSlow = lead.stopped || lead.speed < car.cruise * 0.9 || !!leadToStop;
           if (leadSlow && room < 2 * half + 8) hold = true;
+        }
+        // fila: um ônibus parado no ponto logo depois da faixa faz a fila voltar até ela. Antes de entrar, conta o espaço
+        // livre até o primeiro veículo da pista que vai parar (parado, devagar ou chegando ao ponto), descontando os que estão no meio.
+        if (!hold && frontToZone > -2 && frontToZone < 14) {
+          const ahead = this.cars.filter((o) => o !== car && o.y === car.y && (o.x - car.x) * car.dir > 0).sort((p, q) => (p.x - q.x) * car.dir);
+          const willStop = (o: Car): boolean => {
+            if (o.stopped || o.speed < o.cruise * 0.5) return true;
+            const s = stopOf(o);
+            if (!s || o.dwell !== 0) return false;
+            const d = (s.x - o.dir * 8 - o.x) * o.dir;
+            return d > -2 && d < 150;
+          };
+          const k = ahead.findIndex(willStop);
+          if (k >= 0) {
+            const stopper = ahead[k];
+            let used = 0;
+            for (let i = 0; i < k; i++) used += 2 * halfLen(ahead[i]) + 10;
+            const room = (stopper.x - stopper.dir * halfLen(stopper) - zEnd) * car.dir - used;
+            if (room < 2 * half + 8) hold = true;
+          }
         }
       }
       if (hold || (lead && gap < 10)) {
@@ -131,7 +155,7 @@ export class KuTraffic {
       else if (car.speed < car.cruise) car.speed = Math.min(car.cruise, car.speed + 40 * step);
       car.x += car.dir * car.speed * step;
     }
-    this.dwelling = dwelling ? { x: dwelling.x, y: dwelling.y } : null;
+    this.dwelling = dwelling.map((c) => ({ x: c.x, y: c.y, dir: c.dir }));
     if (this.cars.length) this.cars = this.cars.filter((c) => c.x >= env.x0 - 140 && c.x <= env.x1 + 140);
   }
 }

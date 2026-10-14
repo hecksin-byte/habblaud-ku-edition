@@ -1181,9 +1181,9 @@ export class Renderer {
         x1: (b.x + b.w) * TILE + 40,
         crossing: cross ? { x0: cross.x0, x1: cross.x1 } : null,
         crowded: people ? people.onCrossing(phase) : false,
-        busStopX: people ? people.map.busStop.x : null,
+        busStops: people ? people.map.busStops.map((s) => ({ x: s.x, dir: s.dir })) : [],
       },
-      (x, y) => people?.busArrived(x, y),
+      (x, y, dir) => people?.busArrived(x, y, dir),
     );
     people?.update(dt, this.vehicleInfos(), this.traffic.dwelling, phase);
   }

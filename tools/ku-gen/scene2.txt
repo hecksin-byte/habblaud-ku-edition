@@ -453,31 +453,39 @@
   }
   R(0, southA, LW, 2, STONE[2]);
   const shopBase = LH - 8;
-  const stationX = Math.round(cxA + 190);
+  // Anam: duas saídas da estação (linha 6) e dois pontos de ônibus, um em cada calçada da pista. O ônibus que vai para
+  // leste para na calçada norte (lado do campus) e o que vai para oeste, na sul, sempre depois da faixa de pedestres.
+  const stationX = Math.round(cxA + 150);
+  const stationNX = Math.round(cxA - 290);
   const busX = Math.round(cxA - 230);
+  const busNX = Math.round(cxA + 230);
+  // As calçadas têm só ~16 px de arte: as coberturas ficam no fundo delas (junto às lojas ou à cerca viva), e as
+  // pessoas esperam e entram na frente, do lado da pista.
+  const stBaseS = sY1 + 8;
+  const busBaseS = sY1 + 8;
+  const stBaseN = sidewalkA + 8;
+  const busBaseN = sidewalkA + 8;
   let sx2 = -4;
   let si = 0;
   while (sx2 < LW) {
     const sw = 44 + Math.floor(rnd() * 28);
     const sh = 44 + Math.floor(rnd() * 26);
     const idx = si++;
-    const hitsStation = sx2 + sw > stationX - 6 && sx2 < stationX + 66;
-    const hitsBus = sx2 + sw > busX - 6 && sx2 < busX + 52;
-    if (!hitsStation && !hitsBus) {
-      const x0s = sx2;
-      side.put(southA + 8, () => shop(x0s, sw, sh, shopBase, idx));
-    }
+    const x0s = sx2;
+    side.put(southA + 8, () => shop(x0s, sw, sh, shopBase, idx));
     sx2 += sw + 2;
   }
-  openA(stationX - 2, southA, stationX + 60, shopBase - 12); // a boca da estação fica acessível
-  addDoor('station', stationX + 24, shopBase - 14);
-  side.put(southA + 10, () => subwayEntrance(stationX, shopBase));
-  side.put(southA + 10, () => busStop(busX, shopBase));
+  for (const [sx, base, did] of [[stationX, stBaseS, 'station'], [stationNX, stBaseN, 'station-n']] as [number, number, string][]) {
+    side.put(base, () => subwayEntrance(sx, base), dyn(sx + 30, 72, 52, [-30, -9, 18, -3]));
+    addDoor(did, sx + 24, base + 7);
+  }
+  for (const [bx, base] of [[busX, busBaseS], [busNX, busBaseN]] as [number, number][]) {
+    side.put(base, () => busStop(bx, base), dyn(bx + 22, 56, 48, null));
+  }
   let ti = 0;
   for (let x = 30; x < LW - 10; x += 70 + Math.floor(rnd() * 20), ti++) {
     const ty = LH - 4;
     const pal = [GINKGO, GINKGO, MAPLE, GINKGO][ti % 4];
-    if ((x > stationX - 14 && x < stationX + 74) || (x > busX - 14 && x < busX + 56)) continue;
     side.put(ty, () => tree(x, ty, pal, 0.78, 600 + ti), dyn(x));
   }
   side.put(LH, () => hedge(0, LH - 9, LW, 8, GREEN, 81));
@@ -523,7 +531,10 @@
     doors,
     benches,
     crossing: { x0: WX(cxA - 16), x1: WX(cxA + 16), y0: g.streetY0, y1: g.streetY1 },
-    busStop: { x: WX(busX + 18), y: WY(sY1 + 8) },
+    busStops: [
+      { x: WX(busX + 18), y: WY(busBaseS + 5), dir: -1 },
+      { x: WX(busNX + 18), y: WY(busBaseN + 5), dir: 1 },
+    ],
     portals,
     pois,
   };

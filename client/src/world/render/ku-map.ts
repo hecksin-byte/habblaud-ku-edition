@@ -21,6 +21,11 @@ export interface KuBench {
   w: number;
 }
 
+/** Ponto de ônibus: onde se espera (calçada) e o sentido da pista que para aqui (+1 = leste, -1 = oeste). */
+export interface BusStop extends Pt {
+  dir: 1 | -1;
+}
+
 export interface KuMap {
   cell: number;
   ox: number;
@@ -33,8 +38,8 @@ export interface KuMap {
   benches: KuBench[];
   /** Faixa de pedestres sobre a pista (px de mundo). */
   crossing: { x0: number; x1: number; y0: number; y1: number };
-  /** Onde se espera o ônibus (calçada sul). */
-  busStop: Pt;
+  /** Pontos de ônibus: um em cada calçada, atendidos pela pista que passa rente a ela. */
+  busStops: BusStop[];
   /** Pontos de entrada/saída nas bordas do mundo. */
   portals: Pt[];
   /** Pontos para passear (praça, gramados, calçadas). */
