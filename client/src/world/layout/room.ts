@@ -167,13 +167,12 @@ export function layoutProjectRoom(room: RoomInput, theme: RoomTheme): AreaLayout
   if (v.meeting === 'table') {
     // mesa de reunião comprida com cadeiras (e não banquetas redondas) dos quatro lados
     furn('meeting_table', 10, 5, theme.deskVariant === 'dark' ? 'dark' : 'light', { order: 0.45 });
-    for (let i = 0; i < 3; i++) {
-      seat('stool', 'cafe_chair', 10 + i, 4, 'down', undefined, { order: 0.65 + i * 0.01 }, true);
-      seat('stool', 'cafe_chair', 10 + i, 7, 'up', undefined, { order: 0.68 + i * 0.01 }, true);
+    for (let i = 0; i < 2; i++) {
+      seat('stool', 'cafe_chair', 10 + i * 2, 4, 'down', undefined, { order: 0.65 + i * 0.01 }, true);
+      seat('stool', 'cafe_chair', 10 + i * 2, 7, 'up', undefined, { order: 0.68 + i * 0.01 }, true);
     }
     seat('stool', 'cafe_chair', 9, 5, 'right', undefined, { order: 0.71 }, true);
     seat('stool', 'cafe_chair', 13, 5, 'left', undefined, { order: 0.72 }, true);
-    seat('stool', 'cafe_chair', 13, 6, 'left', undefined, { order: 0.73 }, true);
   } else if (v.meeting === 'round') {
     // dois sofás frente a frente com uma mesa de centro grande entre eles e poltronas nas pontas
     if (theme.rug) rug(9.6, 3.7, 4.8, 4.6, shade(theme.carpet2, 0.25), room.seed + 2);
@@ -183,7 +182,6 @@ export function layoutProjectRoom(room: RoomInput, theme: RoomTheme): AreaLayout
     sofa(10, 7, 'up', 0.62);
     seat('nook', 'armchair', 9, 5, 'right', undefined, { order: 0.65 }, true);
     seat('nook', 'armchair', 12, 5, 'left', undefined, { order: 0.66 }, true);
-    seat('nook', 'armchair', 12, 6, 'left', undefined, { order: 0.67 }, true);
     furn('plant_small', 13, 4, pick(PLANTS_SMALL), { order: 0.5 });
   } else {
     // recanto com poltronas e puffs em volta de uma mesa de centro (sem mesa de reunião)
@@ -192,7 +190,6 @@ export function layoutProjectRoom(room: RoomInput, theme: RoomTheme): AreaLayout
     furn('coffee_table', 10, 6, undefined, { order: 0.46 });
     seat('nook', 'armchair', 9, 5, 'right', undefined, { order: 0.65 }, true);
     seat('nook', 'armchair', 12, 5, 'left', undefined, { order: 0.66 }, true);
-    seat('nook', 'armchair', 12, 6, 'left', undefined, { order: 0.67 }, true);
     sofa(10, 7, 'up', 0.62);
     furn('plant_small', 12, 4, pick(PLANTS_SMALL), { order: 0.5 });
   }

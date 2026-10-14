@@ -61,18 +61,13 @@ export function layoutReception(): AreaLayout {
 
   // mesas de reunião comuns do hall (cadeiras dos quatro lados) e sofá de espera
   b.furn('meeting_table', 3, 4, 'light', { order: 0.46 });
-  for (let i = 0; i < 3; i++) {
-    b.seat('cafe_seat', 'cafe_chair', 3 + i, 3, 'down', 'down', { order: 0.5 + i * 0.01 });
-    b.seat('cafe_seat', 'cafe_chair', 3 + i, 6, 'up', 'up', { order: 0.54 + i * 0.01 });
+  for (const lx of [3, 5]) {
+    b.seat('cafe_seat', 'cafe_chair', lx, 3, 'down', 'down', { order: 0.5 + lx * 0.01 });
+    b.seat('cafe_seat', 'cafe_chair', lx, 6, 'up', 'up', { order: 0.54 + lx * 0.01 });
   }
-  b.seat('cafe_seat', 'cafe_chair', 2, 4, 'right', 'right', { order: 0.57 });
-  b.seat('cafe_seat', 'cafe_chair', 6, 5, 'left', 'left', { order: 0.58 });
   b.furn('meeting_table', 6, 7, 'dark', { order: 0.62 });
-  for (let i = 0; i < 3; i++) {
-    b.seat('cafe_seat', 'cafe_chair', 6 + i, 6, 'down', 'down', { order: 0.64 + i * 0.01 });
-    b.seat('cafe_seat', 'cafe_chair', 6 + i, 9, 'up', 'up', { order: 0.68 + i * 0.01 });
-  }
-  b.seat('cafe_seat', 'cafe_chair', 5, 8, 'right', 'right', { order: 0.71 });
+  b.seat('cafe_seat', 'cafe_chair', 7, 6, 'down', 'down', { order: 0.65 });
+  for (const lx of [6, 8]) b.seat('cafe_seat', 'cafe_chair', lx, 9, 'up', 'up', { order: 0.68 + lx * 0.01 });
   const lobbySofa = b.furn('sofa', 10, 10, 'up', { order: 0.72 });
   for (let i = 0; i < 3; i++) b.seat('sofa', 'sofa', 10 + i, 10, 'up', 'up', { noFurniture: true, furnitureId: lobbySofa });
 
@@ -98,8 +93,6 @@ export function layoutRestroom(): AreaLayout {
   const b = new AreaBuilder(RESTROOM_ID, 'restroom', { x: 0, y: SOUTH_Y, w: COL_W, h: ROOM_H });
   const wall = CORE_WALLS.restroom;
   b.floor('tile_white', 0, 0, 16, 12, 201);
-  // tapetinho só na frente das pias (nada de tapete grande no meio do banheiro)
-  b.rug(2, 3.15, 3, 0.85, '#6fa3b8', 202);
   b.face(0.5, 15, wall, [{ lx: 7, w: 2 }]);
   b.wall('door_frame', 8, undefined, { order: 0.05 });
   b.south(0.5, 15, 11, { ...wall, exterior: true });
@@ -110,13 +103,13 @@ export function layoutRestroom(): AreaLayout {
   b.area.door = { x: 7, y: SOUTH_Y, w: 2, h: 2 };
 
   // pias com espelho
-  for (let i = 0; i < 3; i++) {
+  // pia comprida com espelhos lado a lado, como nos banheiros do campus
+  for (let i = 0; i < 4; i++) {
     b.wall('mirror', 2.5 + i, undefined, { order: 0.3 });
     b.furn('sink', 2 + i, 2, undefined, { order: 0.35 });
     b.spot('sink', 2 + i, 3, 'up', { dy: -3 });
   }
-  b.furn('trash_bin', 5, 2, undefined, { order: 0.4 });
-  b.furn('plant_small', 1, 2, 'fern', { order: 0.2 });
+  b.furn('trash_bin', 1, 2, undefined, { order: 0.4 });
   b.wall('clock', 6, undefined, { order: 0.5 });
 
   // cabines encostadas na parede norte (entram pela porta ao sul e somem)
@@ -125,16 +118,10 @@ export function layoutRestroom(): AreaLayout {
     const stall = b.furn('toilet_stall', lx, 2, undefined, { order: 0.3 + i * 0.05 });
     b.spot('stall', lx, 4, 'up', { furnitureId: stall, x: b.px(lx + 1), y: b.py(4) - 3, sortY: b.py(4) - 0.5 });
   }
-  b.wall('poster', 1.5, 'cat', { order: 0.5 });
-  b.furn('plant_small', 14, 6, 'succulent', { order: 0.2 });
-  b.furn('plant_tall', 1, 10, 'ficus', { order: 0.21 });
-  b.furn('plant_tall', 14, 10, 'monstera', { order: 0.22 });
-  const bench = b.furn('bench', 3, 9, undefined, { order: 0.5 });
-  for (let i = 0; i < 2; i++) b.seat('bench', 'bench', 3 + i, 9, 'down', undefined, { noFurniture: true, furnitureId: bench });
+  // mural de avisos e extintor, como no corredor dos prédios do campus
+  b.wall('poster', 1.5, 'ku_notice', { order: 0.5 });
+  b.furn('fire_extinguisher', 14, 10, undefined, { order: 0.22 });
   b.furn('trash_bin', 9, 10, undefined, { order: 0.6 });
-  b.rug(2.5, 9.9, 3, 0.9, '#9cc3cf', 203);
-  b.furn('plant_small', 1, 6, 'flower', { order: 0.24 });
-  b.furn('plant_small', 12, 10, 'fern', { order: 0.25 });
   return b.build();
 }
 
@@ -262,8 +249,7 @@ export function layoutLounge(): AreaLayout {
   // duas mesas escuras emendadas (6 lugares de largura) com cadeiras pretas
   b.furn('meeting_table', 2, 9, 'dark', { order: 0.45 });
   b.furn('meeting_table', 5, 9, 'dark', { order: 0.46 });
-  for (let lx = 2; lx <= 7; lx++) b.seat('cafe_seat', 'cafe_chair', lx, 8, 'down', 'down', { order: 0.5 + (lx - 2) * 0.01 });
-  b.seat('cafe_seat', 'cafe_chair', 1, 9, 'right', 'right', { order: 0.57 });
+  for (const lx of [2, 4, 6]) b.seat('cafe_seat', 'cafe_chair', lx, 8, 'down', 'down', { order: 0.5 + (lx - 2) * 0.01 });
   b.seat('cafe_seat', 'cafe_chair', 8, 9, 'left', 'left', { order: 0.58 });
   b.spot('talk', 11, 9, 'right', { group: 'talk:lounge', dx: -1 });
   b.spot('talk', 12, 9, 'left', { group: 'talk:lounge', dx: 1 });

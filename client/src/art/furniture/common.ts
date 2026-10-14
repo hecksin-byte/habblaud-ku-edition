@@ -604,7 +604,7 @@ export function arcade(): BufFurniture {
 
 export function toiletStall(state: number): BufFurniture {
   const occupied = state >= 1;
-  const panel = ramp('#a9c4cf', 0.06);
+  const panel = ramp('#9ca3aa', 0.06);
   const rail = ramp('#c3cad4', 0.06);
   const s = floorSheet(2, 2, 26, 3, 4);
   const b = s.buf;
