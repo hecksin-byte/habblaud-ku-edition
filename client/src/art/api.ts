@@ -189,7 +189,16 @@ export type FurnitureKind =
   | 'sink' // 1x1 pia com gabinete (encostada na parede norte; use 'mirror' na parede acima).
   // --- recepção
   | 'reception_desk' // 3x1 balcão de recepção.
-  | 'bench'; // 2x1 banco de espera (assento, olhando para baixo).
+  | 'bench' // 2x1 banco de espera (assento, olhando para baixo).
+  // --- KU Edition (aditivo): o que aparece nas fotos do prédio
+  | 'fire_extinguisher' // 1x1 extintor vermelho (corredor, hall)
+  | 'coat_rack' // 1x1 cabideiro de aço com jaqueta, moletom, mochila e guarda-chuva
+  | 'aed_box' // 1x1 armário verde do desfibrilador (DEA)
+  | 'emergency_box' // 1x1 caixa de emergência amarela, com prateleiras e cruz verde
+  | 'banner_stand' // 1x1 banner vinho em suporte (com o escudo do tigre)
+  | 'pc_kiosk' // 1x1 quiosque de PC para uso em pé (madeira clara e moldura cinza)
+  | 'glass_railing' // 1x1 guarda-corpo de vidro fosco verde com corrimão de madeira. variants: 'h' | 'v'
+  | 'display_case'; // 1 tile (parede). Vitrine de troféus: moldura branca arredondada, fundo vinho
 
 export interface FurnitureDef {
   mount: 'floor' | 'wall';
@@ -217,27 +226,30 @@ export interface FurnitureDef {
  * Ordenação de profundidade: por y da âncora no mundo (maior y = desenhado depois).
  */
 export const FURNITURE: Readonly<Record<FurnitureKind, FurnitureDef>> = {
-  desk: { mount: 'floor', footprint: { w: 2, h: 1 }, blocks: true, variants: ['wood', 'white', 'dark'] },
-  desk_back: { mount: 'floor', footprint: { w: 2, h: 1 }, blocks: true, variants: ['wood', 'white', 'dark'] },
-  office_chair_front: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: false, seat: true, variants: ['black', 'blue', 'red', 'green', 'gray'] },
-  office_chair: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: false, seat: true, variants: ['black', 'blue', 'red', 'green', 'gray'] },
+  // 'beech' (KU Edition): madeira clara de laboratório, com armário alto numa ponta da mesa
+  desk: { mount: 'floor', footprint: { w: 2, h: 1 }, blocks: true, variants: ['wood', 'white', 'dark', 'beech'] },
+  desk_back: { mount: 'floor', footprint: { w: 2, h: 1 }, blocks: true, variants: ['wood', 'white', 'dark', 'beech'] },
+  // 'mesh' (tela escura com apoio de cabeça) e 'white' (branca com base cromada): as cadeiras do laboratório
+  office_chair_front: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: false, seat: true, variants: ['black', 'blue', 'red', 'green', 'gray', 'mesh', 'white'] },
+  office_chair: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: false, seat: true, variants: ['black', 'blue', 'red', 'green', 'gray', 'mesh', 'white'] },
   bookshelf: { mount: 'floor', footprint: { w: 2, h: 1 }, blocks: true },
   filing_cabinet: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
   printer: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
   trash_bin: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
   plant_small: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true, variants: ['fern', 'succulent', 'flower'] },
   plant_tall: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true, variants: ['palm', 'ficus', 'monstera', 'bonsai'] },
-  glass_partition: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true, variants: ['h', 'v', 'end'] },
+  // 'perf_*' (KU Edition): divisória preta perfurada
+  glass_partition: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true, variants: ['h', 'v', 'end', 'perf_h', 'perf_v', 'perf_end'] },
   binder_shelf: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
-  meeting_table: { mount: 'floor', footprint: { w: 3, h: 2 }, blocks: true },
+  meeting_table: { mount: 'floor', footprint: { w: 3, h: 2 }, blocks: true, variants: ['light', 'dark'] },
   stool: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: false, seat: true },
   floor_lamp: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
   water_cooler: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
   whiteboard: { mount: 'wall', footprint: { w: 3, h: 0 }, blocks: false },
   window: { mount: 'wall', footprint: { w: 2, h: 0 }, blocks: false },
   clock: { mount: 'wall', footprint: { w: 1, h: 0 }, blocks: false },
-  poster: { mount: 'wall', footprint: { w: 1, h: 0 }, blocks: false, variants: ['code', 'coffee', 'rocket', 'cat', 'bug', 'ship_it'] },
-  painting: { mount: 'wall', footprint: { w: 2, h: 0 }, blocks: false },
+  poster: { mount: 'wall', footprint: { w: 1, h: 0 }, blocks: false, variants: ['code', 'coffee', 'rocket', 'cat', 'bug', 'ship_it', 'ku_tiger', 'ku_notice'] },
+  painting: { mount: 'wall', footprint: { w: 2, h: 0 }, blocks: false, variants: ['landscape', 'tiger'] },
   tv: { mount: 'wall', footprint: { w: 2, h: 0 }, blocks: false },
   light_switch: { mount: 'wall', footprint: { w: 1, h: 0 }, blocks: false, variants: ['on', 'off'] },
   elevator: { mount: 'wall', footprint: { w: 2, h: 0 }, blocks: false, states: 5 },
@@ -250,7 +262,7 @@ export const FURNITURE: Readonly<Record<FurnitureKind, FurnitureDef>> = {
   coffee_machine: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true, states: 2 },
   microwave: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
   fridge: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
-  vending_machine: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
+  vending_machine: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true, variants: ['classic', 'green', 'pepsi'] },
   cafe_table: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
   cafe_chair: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: false, seat: true, variants: ['up', 'down', 'left', 'right'] },
   sofa: { mount: 'floor', footprint: { w: 3, h: 1 }, blocks: false, seat: true, variants: ['down', 'up'] },
@@ -263,6 +275,14 @@ export const FURNITURE: Readonly<Record<FurnitureKind, FurnitureDef>> = {
   sink: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
   reception_desk: { mount: 'floor', footprint: { w: 3, h: 1 }, blocks: true },
   bench: { mount: 'floor', footprint: { w: 2, h: 1 }, blocks: false, seat: true },
+  fire_extinguisher: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
+  coat_rack: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
+  aed_box: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
+  emergency_box: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
+  banner_stand: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
+  pc_kiosk: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
+  glass_railing: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true, variants: ['h', 'v'] },
+  display_case: { mount: 'wall', footprint: { w: 1, h: 0 }, blocks: false },
 };
 
 export type FloorKind =
@@ -274,9 +294,16 @@ export type FloorKind =
   | 'marble' // recepção
   | 'grass' // área externa
   | 'sidewalk' // calçada externa
-  | 'street'; // rua externa (faixas desenhadas pelo render se quiser)
+  | 'street' // rua externa (faixas desenhadas pelo render se quiser)
+  // --- KU Edition (aditivo): os pisos reais do prédio
+  | 'linoleum' // laboratório/sala de projeto: vinil cinza claro com pontinhos escuros
+  | 'terrazzo' // corredor e lounge: granilite claro com pontinhos e placas mais escuras
+  | 'granite'; // hall de entrada: granito rosado com losangos pretos embutidos
 
-export type WallPattern = 'plain' | 'stripes' | 'tiles' | 'wood_panel' | 'brick' | 'glass' | 'marble';
+export type WallPattern = 'plain' | 'stripes' | 'tiles' | 'wood_panel' | 'brick' | 'glass' | 'marble'
+  // --- KU Edition (aditivo)
+  | 'granite' // hall de entrada: placas de granito rosado, rodapé preto
+  | 'veneer'; // parede da frente da sala de aula: lâminas de madeira clara
 
 export interface WallStyle {
   /** Cor base da face da parede. */

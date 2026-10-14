@@ -62,6 +62,15 @@ export function floorChunk(kind: FloorKind, cx: number, cy: number, o: FloorOpts
     case 'sidewalk':
       paintSidewalk(b, x0, y0, o.seed);
       break;
+    case 'linoleum':
+      paintLinoleum(b, x0, y0, o.seed);
+      break;
+    case 'terrazzo':
+      paintTerrazzo(b, x0, y0, o.seed);
+      break;
+    case 'granite':
+      paintGranite(b, x0, y0, o.seed);
+      break;
     default:
       for (let ty = 0; ty < CHUNK_TILES; ty++) {
         for (let tx = 0; tx < CHUNK_TILES; tx++) {
@@ -263,6 +272,118 @@ function paintMarble(b: PixelBuf, x0: number, y0: number, seed: number): void {
       if (v > 0.997) b.put(px, py, MARBLE_VEIN[1]);
       else if (v > 0.986) b.put(px, py, MARBLE_VEIN[0]);
       else b.put(px, py, MARBLE[Math.min(LEVELS - 1, Math.floor(noise(wx, wy, 20, seed + 11) * LEVELS))]);
+    }
+  }
+}
+
+// ------------------------------------------------------------------ KU Edition: pisos do prédio
+
+const LINO: readonly RGBA[] = Array.from({ length: LEVELS }, (_, i) => rgba(mix('#c7c9c9', '#d9dada', i / (LEVELS - 1))));
+const LINO_SEAM = rgba('#b4b6b6');
+const LINO_EDGE = rgba('#e3e4e4');
+const LINO_SPECK = [rgba('#9fa1a2'), rgba('#8a8c8e'), rgba('#eeefef')] as const;
+
+/** Vinil cinza claro (sala de projeto) em placas de 2x2 tiles, com pontinhos escuros e leve desgaste. */
+function paintLinoleum(b: PixelBuf, x0: number, y0: number, seed: number): void {
+  for (let py = 0; py < CHUNK_PX; py++) {
+    for (let px = 0; px < CHUNK_PX; px++) {
+      const wx = x0 + px;
+      const wy = y0 + py;
+      const sx = wx & 31;
+      const sy = wy & 31;
+      if (sx === 31 || sy === 31) {
+        b.put(px, py, LINO_SEAM);
+        continue;
+      }
+      const sp = h3(wx, wy, 11, seed) % 53;
+      if (sp < 3) {
+        b.put(px, py, LINO_SPECK[sp]);
+        continue;
+      }
+      const n = noise(wx, wy, 30, seed + 21) * 0.65 + noise(wx, wy, 6, seed + 22) * 0.35;
+      const lv = Math.min(LEVELS - 1, Math.floor(n * LEVELS));
+      b.put(px, py, sx === 0 || sy === 0 ? LINO_EDGE : LINO[lv]);
+    }
+  }
+}
+
+const TERRAZZO: readonly RGBA[] = Array.from({ length: LEVELS }, (_, i) => rgba(mix('#dad8d2', '#e6e4df', i / (LEVELS - 1))));
+const TERRAZZO_DARK: readonly RGBA[] = Array.from({ length: LEVELS }, (_, i) => rgba(mix('#a9adae', '#bcc0c1', i / (LEVELS - 1))));
+const TERRAZZO_SEAM = rgba('#c3c2bc');
+const TERRAZZO_SEAM_DARK = rgba('#8d9293');
+const TERRAZZO_CHIPS = [rgba('#7d8083'), rgba('#5e6164'), rgba('#f4f3f0'), rgba('#9a9da0')] as const;
+
+/**
+ * Granilite do corredor e do lounge: placas de 2x2 tiles claras com pontinhos escuros e brancos e, aqui e ali, uma placa mais
+ * escura (as faixas e quadros de cinza dos pisos de verdade).
+ */
+function paintTerrazzo(b: PixelBuf, x0: number, y0: number, seed: number): void {
+  for (let py = 0; py < CHUNK_PX; py++) {
+    for (let px = 0; px < CHUNK_PX; px++) {
+      const wx = x0 + px;
+      const wy = y0 + py;
+      const slab = h3(wx >> 5, wy >> 5, 12, seed) % 100;
+      // faixas escuras: ~1 em cada 5 placas, em sequência de 1–2 placas
+      const dark = slab < 18;
+      const sx = wx & 31;
+      const sy = wy & 31;
+      if (sx === 31 || sy === 31) {
+        b.put(px, py, dark ? TERRAZZO_SEAM_DARK : TERRAZZO_SEAM);
+        continue;
+      }
+      const chip = h3(wx, wy, 13, seed) % (dark ? 17 : 29);
+      if (chip < 4) {
+        b.put(px, py, TERRAZZO_CHIPS[chip]);
+        continue;
+      }
+      const n = noise(wx, wy, 24, seed + 31) * 0.6 + noise(wx, wy, 5, seed + 32) * 0.4;
+      const lv = Math.min(LEVELS - 1, Math.floor(n * LEVELS));
+      b.put(px, py, (dark ? TERRAZZO_DARK : TERRAZZO)[lv]);
+    }
+  }
+}
+
+const GRANITE: readonly RGBA[] = Array.from({ length: LEVELS }, (_, i) => rgba(mix('#d8d1cc', '#e6dfda', i / (LEVELS - 1))));
+const GRANITE_SEAM = rgba('#bdb5b0');
+const GRANITE_CHIPS = [rgba('#8f8079'), rgba('#6b5f5a'), rgba('#3c3a3b'), rgba('#f3eeea')] as const;
+const INLAY = rgba('#2f3034');
+const INLAY_EDGE = rgba('#55575c');
+const INLAY_MAROON = rgba('#7a2f3a');
+const INLAY_CELL = 128;
+
+/**
+ * Granito rosado do hall: placas de 2x2 tiles com pontinhos marrons e pretos, e a cada 8x8 tiles um losango preto embutido
+ * com pequenos losangos vinho nos cantos (como o piso da entrada).
+ */
+function paintGranite(b: PixelBuf, x0: number, y0: number, seed: number): void {
+  for (let py = 0; py < CHUNK_PX; py++) {
+    for (let px = 0; px < CHUNK_PX; px++) {
+      const wx = x0 + px;
+      const wy = y0 + py;
+      const cx = (wx % INLAY_CELL) - INLAY_CELL / 2;
+      const cy = (wy % INLAY_CELL) - INLAY_CELL / 2;
+      const d = Math.abs(cx) + Math.abs(cy);
+      const ex = Math.min(wx % INLAY_CELL, INLAY_CELL - (wx % INLAY_CELL));
+      const ey = Math.min(wy % INLAY_CELL, INLAY_CELL - (wy % INLAY_CELL));
+      if (ex + ey <= 4) {
+        b.put(px, py, INLAY_MAROON);
+        continue;
+      }
+      if (d >= 52 && d <= 55) {
+        b.put(px, py, d === 52 || d === 55 ? INLAY_EDGE : INLAY);
+        continue;
+      }
+      if ((wx & 31) === 31 || (wy & 31) === 31) {
+        b.put(px, py, GRANITE_SEAM);
+        continue;
+      }
+      const chip = h3(wx, wy, 14, seed) % 61;
+      if (chip < 4) {
+        b.put(px, py, GRANITE_CHIPS[chip]);
+        continue;
+      }
+      const n = noise(wx, wy, 22, seed + 41) * 0.6 + noise(wx, wy, 5, seed + 42) * 0.4;
+      b.put(px, py, GRANITE[Math.min(LEVELS - 1, Math.floor(n * LEVELS))]);
     }
   }
 }

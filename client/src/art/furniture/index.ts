@@ -3,6 +3,7 @@
 import { FURNITURE, type FurnitureKind } from '../api';
 import { trim, type BufFurniture } from '../core/sprite';
 import * as C from './common';
+import * as K from './ku';
 import * as O from './office';
 import * as W from './wall';
 
@@ -54,11 +55,11 @@ function build(kind: FurnitureKind, variant: string | undefined, state: number, 
     case 'plant_tall':
       return O.plantTall(variant, seed);
     case 'glass_partition':
-      return O.glassPartition(variant);
+      return variant?.startsWith('perf') ? K.perforatedPartition(variant) : O.glassPartition(variant);
     case 'binder_shelf':
       return O.binderShelf(seed);
     case 'meeting_table':
-      return O.meetingTable(seed);
+      return variant === 'dark' ? K.meetingTableDark(seed) : O.meetingTable(seed);
     case 'stool':
       return O.stool();
     case 'floor_lamp':
@@ -74,7 +75,7 @@ function build(kind: FurnitureKind, variant: string | undefined, state: number, 
     case 'poster':
       return W.poster(variant);
     case 'painting':
-      return W.painting(seed);
+      return variant === 'tiger' ? K.paintingTiger() : W.painting(seed);
     case 'tv':
       return W.tv();
     case 'light_switch':
@@ -100,7 +101,7 @@ function build(kind: FurnitureKind, variant: string | undefined, state: number, 
     case 'fridge':
       return C.fridge();
     case 'vending_machine':
-      return C.vendingMachine();
+      return variant === 'green' || variant === 'pepsi' ? K.vendingMachineVariant(variant) : C.vendingMachine();
     case 'cafe_table':
       return C.cafeTable();
     case 'cafe_chair':
@@ -125,6 +126,22 @@ function build(kind: FurnitureKind, variant: string | undefined, state: number, 
       return C.receptionDesk(seed);
     case 'bench':
       return C.bench();
+    case 'fire_extinguisher':
+      return K.fireExtinguisher();
+    case 'coat_rack':
+      return K.coatRack();
+    case 'aed_box':
+      return K.aedBox();
+    case 'emergency_box':
+      return K.emergencyBox();
+    case 'banner_stand':
+      return K.bannerStand();
+    case 'pc_kiosk':
+      return K.pcKiosk();
+    case 'glass_railing':
+      return K.glassRailing(variant);
+    case 'display_case':
+      return K.displayCase();
   }
 }
 

@@ -43,9 +43,9 @@ const SCREEN_PT: Record<ScreenMode, string> = {
   off: 'desligado', standby: 'em espera', idle: 'descanso', code: 'código', terminal: 'terminal', browser: 'navegador', search: 'busca', chat: 'chat', docs: 'documento', tasks: 'tarefas', alert: 'alerta',
   progress: 'progresso', show: 'programa', game: 'videogame',
 };
-const FLOORS: readonly FloorKind[] = ['carpet', 'wood', 'tile_check', 'tile_white', 'concrete', 'marble', 'grass', 'sidewalk', 'street'];
+const FLOORS: readonly FloorKind[] = ['carpet', 'wood', 'tile_check', 'tile_white', 'concrete', 'marble', 'grass', 'sidewalk', 'street', 'linoleum', 'terrazzo', 'granite'];
 const FLOOR_PT: Record<FloorKind, string> = {
-  carpet: 'carpete', wood: 'madeira', tile_check: 'xadrez', tile_white: 'azulejo', concrete: 'cimento polido', marble: 'mármore', grass: 'grama', sidewalk: 'calçada', street: 'asfalto',
+  carpet: 'carpete', wood: 'madeira', tile_check: 'xadrez', tile_white: 'azulejo', concrete: 'cimento polido', marble: 'mármore', grass: 'grama', sidewalk: 'calçada', street: 'asfalto', linoleum: 'vinil cinza (laboratório)', terrazzo: 'granilite (corredor)', granite: 'granito com losangos (hall)',
 };
 const ICONS: readonly IconName[] = [
   'alert', 'question', 'zzz', 'check', 'heart', 'coffee', 'music', 'idea', 'sweat', 'star', 'lightning', 'chat', 'box', 'wave',
@@ -723,7 +723,7 @@ function floors(): void {
 function walls(): void {
   const s = section('paredes', 'Paredes', 'Face norte (2 tiles, tampa escura + rodapé) em todos os padrões, com passagem recortada; abaixo, parede sul (tampa + mureta) e tampa lateral.');
   const patterns: { name: string; style: WallStyle }[] = [
-    ...(['plain', 'stripes', 'tiles', 'wood_panel', 'brick', 'glass', 'marble'] as WallPattern[]).map((p) => ({
+    ...(['plain', 'stripes', 'tiles', 'wood_panel', 'brick', 'glass', 'marble', 'granite', 'veneer'] as WallPattern[]).map((p) => ({
       name: p,
       style: { base: p === 'brick' ? '#c98a6a' : p === 'tiles' ? '#e8eef2' : '#eef1f4', trim: '#9fb0c4', pattern: p },
     })),

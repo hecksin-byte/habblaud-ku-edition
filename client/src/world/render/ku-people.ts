@@ -30,8 +30,8 @@ interface Look {
 }
 
 const CRIMSON = '#8b0029';
-const SKIN = ['#f1c9a0', '#e8b88a', '#d9a273', '#c68a5e', '#a8704a'];
-const HAIR = ['#1a1410', '#2b1d14', '#4a2a1a', '#6a3a1a', '#9a9aa0'];
+const SKIN = ['#f7dcc4', '#f2d1b6', '#edc7aa', '#e7bd9d', '#e0b392'];
+const HAIR = ['#17120f', '#1f1814', '#2b1d14', '#2b1d14', '#4a2a1a'];
 const TOPS = ['#d9534a', '#3f7fd8', '#4cae6a', '#f2c14e', '#8d66cf', '#e2e2e0', '#2fb3a3', '#c9713f', '#f08aa0'];
 const SCHOOL_TOPS = ['#2c3550', '#7a7f8a', '#2a2a30', '#c9b79a', '#4f7fa8'];
 const BOTTOMS = ['#2c3550', '#3a3f48', '#6b5b4a', '#7a7f8a', '#1f2a44', '#4a5468', '#e3dfd3'];

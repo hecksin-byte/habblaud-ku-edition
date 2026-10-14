@@ -3,6 +3,7 @@
 import { ramp, shade } from '../core/color';
 import { rectAt, wallSheet, type BufFurniture } from '../core/sprite';
 import { ACCENTS, M, book, foliage, glass, mug, pick, pot, rngOf, smallSucculent } from './kit';
+import { posterKu } from './ku';
 
 /** Sombra suave projetada na parede (abaixo/direita do objeto). */
 function wallShadow(b: import('../core/pixbuf').PixelBuf, x: number, y: number, w: number, h: number): void {
@@ -65,6 +66,11 @@ export function windowItem(): BufFurniture {
   const gy = y + 2;
   const gw = w - 4;
   const gh = h - 4;
+  // Persiana de rolo bege meio descida (como nas janelas do laboratório e das salas de aula).
+  b.rect(gx, gy, gw, 6, '#ece7d8');
+  b.hline(gx, gx + gw - 1, gy + 6, '#bfb8a3');
+  b.rect(gx + Math.floor(gw / 2) - 1, gy + 6, 2, 1, '#8a8470');
+  for (let yy = gy + 1; yy < gy + 6; yy += 2) b.hline(gx, gx + gw - 1, yy, '#e1dccb');
   for (const off of [3, 16]) {
     b.line(gx + off + 6, gy, gx + off, gy + gh - 1, 'rgba(255,255,255,0.28)');
     b.line(gx + off + 7, gy, gx + off + 1, gy + gh - 1, 'rgba(255,255,255,0.16)');
@@ -169,6 +175,10 @@ export function poster(variant: string | undefined): BufFurniture {
       b.set(ix + 1, iy + 2, '#f7d154');
       break;
     }
+    case 'ku_tiger':
+    case 'ku_notice':
+      posterKu(variant ?? 'ku_notice').draw(b, ix, iy, iw, ih);
+      break;
     default: {
       // code: editor escuro com linhas coloridas e "</>".
       b.rect(ix, iy, iw, ih, '#1f2433');

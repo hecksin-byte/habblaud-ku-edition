@@ -118,6 +118,32 @@ export function wallFaceTile(style: WallStyle, variant: number, col: number): Pi
       if (col % 2 === 1) b.vline(TILE - 1, fy, fy + fh - 1, 'rgba(120,126,138,0.35)');
       break;
     }
+    case 'granite': {
+      // Placas de granito rosado: fiadas de 11px, juntas verticais a cada 2 tiles e pontinhos escuros.
+      const g = mix('#cdc4be', base, 0.35);
+      b.rect(0, fy, TILE, fh, g);
+      for (let row = 0; row * 11 < fh; row++) {
+        const y = fy + row * 11;
+        b.hline(0, TILE - 1, y, shade(g, 0.05));
+        if (y + 10 < fy + fh) b.hline(0, TILE - 1, y + 10, shade(g, -0.1));
+      }
+      for (let i = 0; i < 26; i++) b.set(Math.floor(r() * TILE), fy + Math.floor(r() * fh), [shade(g, -0.2), shade(g, -0.32), shade(g, 0.1)][Math.floor(r() * 3)]);
+      if (col % 2 === 1) b.vline(TILE - 1, fy, fy + fh - 1, shade(g, -0.1));
+      break;
+    }
+    case 'veneer': {
+      // Lâminas verticais de madeira clara (parede da frente da sala de aula), com veios e juntas.
+      const w = ramp(mix('#d4b184', base, 0.2), 0.04);
+      b.rect(0, fy, TILE, fh, w.base);
+      for (let x = 0; x < TILE; x += 8) {
+        b.vline(x, fy, fy + fh - 1, w.dk);
+        b.vline(x + 1, fy, fy + fh - 1, w.hi);
+        const y0g = fy + Math.floor(r() * (fh - 6));
+        b.vline(x + 3 + Math.floor(r() * 3), y0g, y0g + 4 + Math.floor(r() * 5), w.dk);
+        b.vline(x + 5, fy + Math.floor(r() * fh), fy + fh - 1 - Math.floor(r() * 6), w.lt);
+      }
+      break;
+    }
     case 'plain':
       if (style.exterior) speckle(b, variant * 13 + col, 5, [shade(base, -0.03), shade(base, 0.03)]);
       break;

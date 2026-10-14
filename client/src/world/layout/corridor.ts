@@ -7,13 +7,11 @@ export const CORRIDOR_ID = 'core:corredor';
 
 const TALL = ['ficus', 'palm', 'monstera', 'bonsai'] as const;
 const SMALL = ['fern', 'succulent', 'flower'] as const;
-/** Passadeira: uma família de cor só (azul-acinzentado discreto), com leve variação de tom. */
-const RUNNERS = ['#8b9bb0', '#8597ab', '#909fb3'] as const;
 
 export function layoutCorridor(cols: number): AreaLayout {
   const w = cols * COL_W;
   const b = new AreaBuilder(CORRIDOR_ID, 'corridor', { x: 0, y: CORRIDOR_Y, w, h: CORRIDOR_H });
-  b.floor('concrete', 0, 0, w, CORRIDOR_H, 501);
+  b.floor('terrazzo', 0, 0, w, CORRIDOR_H, 501);
   // fachadas de vidro nas pontas do corredor (entrada principal a oeste)
   for (let ly = 0; ly < CORRIDOR_H; ly++) {
     b.furn('glass_partition', 0, ly, ly === 0 || ly === CORRIDOR_H - 1 ? 'end' : 'v', { order: 0.1 });
@@ -45,10 +43,10 @@ export function layoutCorridor(cols: number): AreaLayout {
       }
       if (k % 2 === 1) b.furn('plant_small', x + 12, 4, SMALL[(k + 1) % SMALL.length], { order: 0.5 });
     }
+    // extintor na parede de cada coluna (menos na da entrada)
+    if (c >= 1) b.furn('fire_extinguisher', x + 6, 0, undefined, { order: 0.5 });
     // planta alta onde as paredes das salas se encontram (uma coluna sim, outra não)
     if (!last && c % 2 === 1) b.furn('plant_tall', x + 15, 4, TALL[(c + 1) % TALL.length], { order: 0.5 });
-    // passadeira estreita (um trecho por coluna), centrada no corredor
-    b.rug(x + 2, 1.95, COL_W - 4, 1.1, RUNNERS[c % RUNNERS.length], 502 + c);
     // pontos de conversa no meio do corredor
     b.spot('talk', x + 5, 2, 'right', { group: `talk:corredor:${c}`, dx: -1 });
     b.spot('talk', x + 6, 2, 'left', { group: `talk:corredor:${c}`, dx: 1 });

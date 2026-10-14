@@ -4,23 +4,22 @@ import { ACCESSORIES, BOTTOM_STYLES, FACIAL_HAIR, HAIR_STYLES, PART_KEYS, TOP_ST
 import { mulberry32 } from '../../../../shared/hash';
 import type { Accessory, Appearance, HairStyle, TopStyle } from '../api';
 
-export const SKINS = ['#ffe2cc', '#f6cfb0', '#eab894', '#d69f78', '#bd8560', '#9a6444', '#7a4a31', '#5a3623'] as const;
+// Tons de pele de leste-asiático (os agentes têm nomes coreanos): do claro-rosado ao trigueiro claro, sem os extremos.
+export const SKINS = ['#fde6d4', '#f9dcc6', '#f5d2b9', '#f0c8ac', '#ebbf9f', '#e4b494'] as const;
 
 const HAIR_NATURAL: readonly (readonly [string, number])[] = [
-  ['#2b2530', 5], // preto
-  ['#3f2c22', 5], // castanho-escuro
-  ['#5f3c28', 4], // castanho
-  ['#87593a', 2.5], // castanho-claro
-  ['#b0703c', 1.2], // ruivo-acobreado
-  ['#8e3b2b', 1], // acaju
-  ['#d6ae68', 1.8], // loiro
-  ['#ebdcb0', 0.7], // platinado
-  ['#8f929b', 0.7], // grisalho
-  ['#d9dbe0', 0.5], // branco
+  ['#1f1b22', 9], // preto
+  ['#2b2530', 6], // preto-azulado
+  ['#33261f', 3], // castanho quase preto
+  ['#241a2b', 2], // preto-arroxeado
+  ['#3f2c22', 4], // castanho-escuro
+  ['#5f3c28', 2], // castanho (tingido)
+  ['#7a5238', 0.8], // castanho-claro (tingido)
+  ['#8f929b', 0.3], // grisalho
 ];
 const HAIR_FUN = ['#e47aa8', '#5b8fe0', '#8f6ad8', '#3fb3a0', '#e0584e', '#7cc45a', '#f0a24a'] as const;
 
-const EYES = ['#2b2236', '#2b2236', '#4a2f22', '#5a3b22', '#2f5f9e', '#3c7a52'] as const;
+const EYES = ['#2b2236', '#2b2236', '#3a281e', '#4a2f22'] as const;
 
 const TOP_COLORS = [
   '#e2604f', '#4a86d8', '#4bab72', '#efb54a', '#8d66cf', '#36b0b0', '#e47aa8', '#3d4352', '#f1efe9',
@@ -109,7 +108,7 @@ export function appearanceFromSeed(seed: number, opts: { look?: 'f' | 'm'; sub?:
   const lookRoll = rnd();
   const look: 'f' | 'm' = opts.look ?? (lookRoll < 0.5 ? 'f' : 'm');
   const skin = pick(SKINS);
-  const fun = rnd() < 0.08;
+  const fun = rnd() < 0.05;
   const hair = fun ? pick(HAIR_FUN) : weightedPair(HAIR_NATURAL);
   let hairStyle = weighted(HAIR_W[look]);
   const eyes = pick(EYES);

@@ -27,6 +27,8 @@ function deskMats(variant: string | undefined): DeskMats {
       return { top: M.white, edge: ramp('#d7d6d1', 0.05), legs: M.steel, ped: ramp('#dcdbd6', 0.05) };
     case 'dark':
       return { top: M.walnut, edge: ramp('#5f4535', 0.06), legs: M.graphite, ped: ramp('#5a4334', 0.06) };
+    case 'beech':
+      return { top: ramp('#e4cba2', 0.045), edge: ramp('#c9a874', 0.06), legs: ramp('#f1f1ee', 0.04), ped: ramp('#dcc196', 0.05) };
     default:
       return { top: M.oak, edge: M.oakDark, legs: ramp('#e9e8e4', 0.05), ped: ramp('#e6e4de', 0.05) };
   }
@@ -151,6 +153,52 @@ function deskTop(s: BufSprite, seed: number, tone: DeskItemTone): { screen: Box;
   return { screen, screen2 };
 }
 
+/** Armário alto de madeira clara numa ponta da mesa (como nas mesas do laboratório): duas portas, puxador e um fone pendurado. */
+function hutch(b: PixelBuf, front: boolean, headphones: boolean): void {
+  const wood = ramp('#dfc496', 0.05);
+  const x = 0;
+  const w = 9;
+  const top = -20;
+  if (front) {
+    b.rect(x, top + 3, w, 17, wood.base);
+    b.rect(x, top, w, 3, wood.hi);
+    b.hline(x, x + w - 1, top, wood.lt);
+    b.hline(x, x + w - 1, top + 3, wood.dk);
+    b.vline(x + w - 1, top + 3, top + 19, wood.dk);
+    b.vline(x + 4, top + 4, top + 18, wood.dd);
+    b.hline(x, x + w - 1, top + 19, wood.dd);
+    b.set(x + 3, top + 10, '#9aa1ad');
+    b.set(x + 5, top + 10, '#9aa1ad');
+    woodGrain(b, x + 1, top + 5, w - 2, 13, wood, 5, true);
+    if (headphones) {
+      // fone no gancho do lado direito do armário
+      b.vline(x + w, top + 8, top + 9, '#c9ced6');
+      b.hline(x + w - 1, x + w + 1, top + 10, '#2a2d35');
+      b.rect(x + w - 1, top + 11, 2, 3, '#2a2d35');
+      b.rect(x + w + 1, top + 11, 2, 3, '#2a2d35');
+    }
+  } else {
+    // visto por trás: painel liso, mais escuro
+    const back = ramp('#cdb083', 0.05);
+    b.rect(x, top + 3, w, 17, back.base);
+    b.rect(x, top, w, 3, back.lt);
+    b.hline(x, x + w - 1, top + 3, back.dk);
+    b.vline(x + w - 1, top + 3, top + 19, back.dk);
+    b.hline(x, x + w - 1, top + 19, back.dd);
+    woodGrain(b, x + 1, top + 5, w - 2, 13, back, 9, true);
+  }
+}
+
+/** Ventilador de mesa pequeno (branco com pás cinza), como o das mesas do laboratório. */
+function deskFan(b: PixelBuf, x: number, y: number): void {
+  b.rect(x + 2, y + 5, 3, 3, '#e6e8ea');
+  b.hline(x + 1, x + 5, y + 8, '#c3c8cf');
+  b.ellipse(x + 3, y + 2, 3, 3, '#dfe3e6');
+  b.set(x + 3, y + 2, '#8e96a1');
+  b.hline(x + 1, x + 5, y + 2, '#a9b0ba');
+  b.vline(x + 3, y, y + 4, '#a9b0ba');
+}
+
 /** Tom dos objetos conforme o tampo: no branco, um degrau mais escuros e com sombra firme. */
 function itemTone(variant: string | undefined): DeskItemTone {
   return variant === 'white' ? 'onLight' : 'light';
@@ -159,8 +207,15 @@ function itemTone(variant: string | undefined): DeskItemTone {
 export function desk(variant: string | undefined, seed: number): BufFurniture {
   const s = floorSheet(2, 1, 20);
   const m = deskMats(variant);
-  deskBody(s, m, seed, false);
-  const scr = deskTop(s, seed, itemTone(variant));
+  const beech = variant === 'beech';
+  // Na mesa de laboratório o armário ocupa a ponta esquerda: só as arrumações com o monitor mais à direita servem.
+  const dseed = beech ? [0, 3, 5][((seed % 3) + 3) % 3] : seed;
+  deskBody(s, m, dseed, false);
+  const scr = deskTop(s, dseed, itemTone(variant));
+  if (beech) {
+    hutch(s.buf, true, seed % 2 === 0);
+    if (seed % 3 === 1) deskFan(s.buf, 25, -9);
+  }
   s.buf.outline();
   deskShadow(s.buf);
   s.rects = { screen: rectAt(s, scr.screen.x, scr.screen.y, scr.screen.w, scr.screen.h) };
@@ -169,7 +224,7 @@ export function desk(variant: string | undefined, seed: number): BufFurniture {
 }
 
 export function deskBack(variant: string | undefined, seed: number): BufFurniture {
-  const s = floorSheet(2, 1, 12);
+  const s = floorSheet(2, 1, variant === 'beech' ? 22 : 12);
   const m = deskMats(variant);
   const b = s.buf;
   deskBody(s, m, seed, true);
@@ -189,6 +244,7 @@ export function deskBack(variant: string | undefined, seed: number): BufFurnitur
     if (v === 3) photoFrame(b, 2, -3);
     else mug(b, 2, 0, mugC);
   }
+  if (variant === 'beech') hutch(b, false, false);
   b.outline();
   deskShadow(b);
   return { base: s };
@@ -202,10 +258,19 @@ const CHAIR_COLORS: Readonly<Record<string, string>> = {
   red: '#b44a4a',
   green: '#3f8a62',
   gray: '#8b929e',
+  mesh: '#2f3239',
+  white: '#e9ecef',
 };
 
 function chairRamp(variant: string | undefined): Ramp {
-  return ramp(CHAIR_COLORS[variant ?? 'black'] ?? CHAIR_COLORS.black, 0.07);
+  return ramp(CHAIR_COLORS[variant ?? 'black'] ?? CHAIR_COLORS.black, variant === 'white' ? 0.04 : 0.07);
+}
+
+const isMeshChair = (variant: string | undefined): boolean => variant === 'mesh' || variant === 'white';
+
+/** Trama de tela (pontinhos alternados) e apoio de cabeça das cadeiras ergonômicas do laboratório. */
+function meshTexture(b: PixelBuf, x0: number, y0: number, x1: number, y1: number, c: Ramp): void {
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if ((x + y) % 2 === 0) b.set(x, y, c.lt);
 }
 
 /** Base estrela com rodízios + pistão. */
@@ -251,6 +316,13 @@ export function officeChair(variant: string | undefined): BufFurniture {
   f.hline(5, 10, 10, c.dk);
   f.hline(4, 11, 12, c.dd);
   f.rect(7, 13, 2, 1, '#4a505c');
+  if (isMeshChair(variant)) {
+    // encosto de tela alto, com apoio de cabeça
+    f.rect(5, 3, 6, 4, c.base);
+    f.hline(6, 9, 3, c.lt);
+    f.vline(10, 4, 6, c.dk);
+    meshTexture(f, 5, 8, 10, 11, c);
+  }
   f.outline();
   return { base, front };
 }
@@ -268,6 +340,12 @@ export function officeChairFront(variant: string | undefined): BufFurniture {
   b.vline(12, -6, 3, c.dk);
   b.hline(3, 12, 3, c.dd);
   b.rect(7, 4, 2, 2, '#4a505c');
+  if (isMeshChair(variant)) {
+    // encosto de tela com apoio de cabeça
+    b.rect(5, -9, 6, 3, c.lt);
+    b.hline(6, 9, -9, c.hi);
+    meshTexture(b, 5, -4, 10, 1, c);
+  }
   // Assento.
   b.rect(2, 5, 12, 5, c.lt);
   b.hline(3, 12, 5, c.hi);

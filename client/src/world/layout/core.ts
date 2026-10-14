@@ -11,11 +11,11 @@ export const LOUNGE_ID = 'core:lounge';
 
 /** Paredes do núcleo: tons claros e neutros (frios), com acabamentos diferentes por ambiente. */
 export const CORE_WALLS = {
-  reception: { base: '#e9e5dc', trim: '#a88e6c', pattern: 'wood_panel' } satisfies WallStyle,
+  reception: { base: '#d9d1cb', trim: '#2f3033', pattern: 'granite' } satisfies WallStyle,
   restroom: { base: '#dce8ee', trim: '#8fb0c0', pattern: 'tiles' } satisfies WallStyle,
   cafe: { base: '#eef0ee', trim: '#9aa6ad', pattern: 'plain' } satisfies WallStyle,
   cafeSplash: { base: '#d9dcdf', trim: '#8d969e', pattern: 'marble' } satisfies WallStyle,
-  lounge: { base: '#e6e2ea', trim: '#8f8aa3', pattern: 'plain' } satisfies WallStyle,
+  lounge: { base: '#e7e8e4', trim: '#8a8f93', pattern: 'plain' } satisfies WallStyle,
   glass: { base: '#cfe6f0', trim: '#9fb9c6', pattern: 'glass' } satisfies WallStyle,
 };
 
@@ -25,9 +25,7 @@ export const ELEVATOR_CX = [3, 6.5] as const;
 export function layoutReception(): AreaLayout {
   const b = new AreaBuilder(RECEPTION_ID, 'reception', { x: 0, y: NORTH_Y, w: COL_W, h: ROOM_H });
   const wall = CORE_WALLS.reception;
-  b.floor('marble', 0, 0, 16, 12, 101);
-  b.rug(1.5, 2.2, 6.5, 2.6, '#3d5a80', 102);
-  b.rug(8.6, 6.4, 5.2, 3.2, '#b65f3a', 103);
+  b.floor('granite', 0, 0, 16, 12, 101);
   b.face(0.5, 15, wall);
   b.cap(0, 0, 0.5, 12, wall);
   b.cap(15.5, 0, 0.5, 12, wall);
@@ -40,9 +38,17 @@ export function layoutReception(): AreaLayout {
   });
   b.wall('sign', 11, undefined, { order: 0.9 });
   b.wall('clock', 8.15, undefined, { order: 0.7 });
-  b.wall('painting', 14.25, undefined, { order: 0.6 });
+  b.wall('painting', 14.25, 'tiger', { order: 0.6 });
+  // vitrines de troféus (moldura branca, fundo vinho) entre os elevadores e na ponta
+  b.wall('display_case', 1.25, undefined, { order: 0.3 });
+  b.wall('display_case', 4.75, undefined, { order: 0.31 });
 
-  b.furn('plant_tall', 1, 2, 'monstera', { order: 0.2 });
+  b.furn('plant_small', 1, 2, 'fern', { order: 0.2 });
+  // caixa de emergência, DEA e extintor junto à parede oeste; banner vinho no hall
+  b.furn('emergency_box', 1, 3, undefined, { order: 0.3 });
+  b.furn('aed_box', 1, 4, undefined, { order: 0.31 });
+  b.furn('fire_extinguisher', 1, 5, undefined, { order: 0.32 });
+  b.furn('banner_stand', 5, 10, undefined, { order: 0.33 });
   b.furn('plant_tall', 14, 4, 'ficus', { order: 0.21 });
   b.furn('reception_desk', 9, 5, undefined, { order: 0.4 });
   b.furn('plant_small', 12, 5, 'flower', { order: 0.45 });
@@ -60,8 +66,8 @@ export function layoutReception(): AreaLayout {
   b.furn('water_cooler', 1, 7, undefined, { order: 0.53 });
   b.spot('water', 1, 8, 'up', { dy: -3 });
 
-  // aberta para o corredor: divisórias de vidro nas pontas
-  for (const lx of [1, 2, 3, 12, 13, 14]) b.furn('glass_partition', lx, 11, 'h', { order: 0.15 });
+  // aberta para o corredor: guarda-corpo de vidro fosco com o escudo do tigre
+  for (const lx of [1, 2, 3, 12, 13, 14]) b.furn('glass_railing', lx, 11, 'h', { order: 0.15 });
   b.walk(1, 2, 14, 10);
   b.spot('talk', 6, 9, 'right', { group: 'talk:recepcao', dx: -1 });
   b.spot('talk', 7, 9, 'left', { group: 'talk:recepcao', dx: 1 });
@@ -143,7 +149,7 @@ export function layoutCafe(): AreaLayout {
   b.wall('poster', 5.5, 'coffee', { order: 0.45 });
   b.wall('clock', 7.5, undefined, { order: 0.6 });
 
-  const vend = b.furn('vending_machine', 9, 2, undefined, { order: 0.34 });
+  const vend = b.furn('vending_machine', 9, 2, 'green', { order: 0.34 });
   b.spot('snack', 9, 3, 'up', { dy: -3, furnitureId: vend });
   b.furn('water_cooler', 10, 2, undefined, { order: 0.36 });
   b.spot('water', 10, 3, 'up', { dy: -3 });
@@ -177,8 +183,8 @@ export function layoutCafe(): AreaLayout {
   b.furn('plant_tall', 14, 10, 'ficus', { order: 0.21 });
   b.furn('trash_bin', 1, 6, undefined, { order: 0.6 });
 
-  // aberta para o corredor com vidro
-  for (const lx of [1, 2, 3, 4, 5, 10, 11, 12, 13, 14]) b.furn('glass_partition', lx, 11, 'h', { order: 0.15 });
+  // aberta para o corredor com guarda-corpo de vidro fosco
+  for (const lx of [1, 2, 3, 4, 5, 10, 11, 12, 13, 14]) b.furn('glass_railing', lx, 11, 'h', { order: 0.15 });
   b.walk(1, 2, 14, 10);
   b.spot('talk', 7, 9, 'right', { group: 'talk:copa', dx: -1 });
   b.spot('talk', 8, 9, 'left', { group: 'talk:copa', dx: 1 });
@@ -189,9 +195,7 @@ export function layoutCafe(): AreaLayout {
 export function layoutLounge(): AreaLayout {
   const b = new AreaBuilder(LOUNGE_ID, 'lounge', { x: COL_W, y: SOUTH_Y, w: COL_W, h: ROOM_H });
   const wall = CORE_WALLS.lounge;
-  b.floor('wood', 0, 0, 16, 12, 401);
-  b.rug(1.5, 3.2, 7, 5.2, '#4f8a5b', 402);
-  b.rug(9.2, 4.6, 5.6, 4.4, '#d7c8a8', 403);
+  b.floor('terrazzo', 0, 0, 16, 12, 401);
   // parede com TV a oeste; vidro a leste; passagem larga no meio
   b.face(0.5, 6.5, wall);
   b.face(10, 5.5, CORE_WALLS.glass);
@@ -203,7 +207,7 @@ export function layoutLounge(): AreaLayout {
   b.area.door = { x: COL_W + 7, y: SOUTH_Y, w: 3, h: 2 };
 
   b.wall('tv', 4.5, undefined, { order: 0.4 });
-  b.wall('painting', 1.75, undefined, { order: 0.5 });
+  b.wall('painting', 1.75, 'tiger', { order: 0.5 });
 
   // sofá de costas para a câmera, de frente para a TV
   const sofa = b.furn('sofa', 3, 6, 'up', { order: 0.5 });
@@ -227,13 +231,20 @@ export function layoutLounge(): AreaLayout {
   }
   b.furn('bookshelf', 10, 2, undefined, { order: 0.3 });
   b.spot('shelf', 10, 3, 'up', { dx: 8, dy: -2 });
-  b.furn('binder_shelf', 12, 2, undefined, { order: 0.31 });
+  b.furn('vending_machine', 12, 2, 'pepsi', { order: 0.31 });
   // planta baixa sob o quadro (uma alta cobriria a pintura)
   b.furn('plant_small', 1, 2, 'fern', { order: 0.2 });
   b.furn('plant_tall', 6, 2, 'palm', { order: 0.21 });
-  b.furn('printer', 1, 10, undefined, { order: 0.3 });
+  b.furn('printer', 5, 10, undefined, { order: 0.3 });
   b.furn('floor_lamp', 1, 7, undefined, { order: 0.32 });
-  b.furn('plant_tall', 14, 10, 'monstera', { order: 0.22 });
+  b.furn('plant_tall', 11, 10, 'monstera', { order: 0.22 });
+  // cantinho de PCs para usar em pé (como na Open Library)
+  for (const lx of [12, 13, 14]) b.furn('pc_kiosk', lx, 10, undefined, { order: 0.3 + (lx - 12) * 0.01 });
+  // mesa de reunião escura com cadeiras pretas (como o canto de estudo da Open Library)
+  b.furn('meeting_table', 2, 9, 'dark', { order: 0.45 });
+  for (const lx of [2, 3, 4]) b.seat('cafe_seat', 'cafe_chair', lx, 8, 'down', 'down', { order: 0.5 + (lx - 2) * 0.01 });
+  b.seat('cafe_seat', 'cafe_chair', 1, 9, 'right', 'right', { order: 0.55 });
+  b.seat('cafe_seat', 'cafe_chair', 5, 9, 'left', 'left', { order: 0.56 });
 
   // puffs
   (['red', 'blue', 'yellow'] as const).forEach((c, i) => {

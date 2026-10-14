@@ -158,8 +158,11 @@ describe('layout do prédio', () => {
 });
 
 /** Móveis de chão altos que escondem o que está pendurado na parede logo atrás. */
-const TALL_FLOOR = new Set<FurnitureKind>(['plant_tall', 'bookshelf', 'binder_shelf', 'fridge', 'vending_machine', 'arcade', 'water_cooler', 'floor_lamp', 'toilet_stall']);
-const WALL_DECOR = new Set<FurnitureKind>(['painting', 'poster', 'window', 'tv', 'whiteboard', 'sign', 'clock', 'mirror', 'door_frame']);
+const TALL_FLOOR = new Set<FurnitureKind>([
+  'plant_tall', 'bookshelf', 'binder_shelf', 'fridge', 'vending_machine', 'arcade', 'water_cooler', 'floor_lamp', 'toilet_stall',
+  'coat_rack', 'aed_box', 'emergency_box', 'banner_stand', 'pc_kiosk',
+]);
+const WALL_DECOR = new Set<FurnitureKind>(['painting', 'poster', 'window', 'tv', 'whiteboard', 'sign', 'clock', 'mirror', 'door_frame', 'display_case']);
 
 /** Itens de parede decorativos com algum móvel alto encostado na frente (ids). */
 function hiddenWallItems(area: AreaLayout): string[] {
