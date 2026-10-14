@@ -346,10 +346,6 @@ function paintTerrazzo(b: PixelBuf, x0: number, y0: number, seed: number): void 
 const GRANITE: readonly RGBA[] = Array.from({ length: LEVELS }, (_, i) => rgba(mix('#d8d1cc', '#e6dfda', i / (LEVELS - 1))));
 const GRANITE_SEAM = rgba('#bdb5b0');
 const GRANITE_CHIPS = [rgba('#8f8079'), rgba('#6b5f5a'), rgba('#3c3a3b'), rgba('#f3eeea')] as const;
-const INLAY = rgba('#2f3034');
-const INLAY_EDGE = rgba('#55575c');
-const INLAY_MAROON = rgba('#7a2f3a');
-const INLAY_CELL = 128;
 
 /**
  * Granito rosado do hall: placas de 2x2 tiles com pontinhos marrons e pretos, e a cada 8x8 tiles um losango preto embutido
@@ -360,19 +356,6 @@ function paintGranite(b: PixelBuf, x0: number, y0: number, seed: number): void {
     for (let px = 0; px < CHUNK_PX; px++) {
       const wx = x0 + px;
       const wy = y0 + py;
-      const cx = (wx % INLAY_CELL) - INLAY_CELL / 2;
-      const cy = (wy % INLAY_CELL) - INLAY_CELL / 2;
-      const d = Math.abs(cx) + Math.abs(cy);
-      const ex = Math.min(wx % INLAY_CELL, INLAY_CELL - (wx % INLAY_CELL));
-      const ey = Math.min(wy % INLAY_CELL, INLAY_CELL - (wy % INLAY_CELL));
-      if (ex + ey <= 4) {
-        b.put(px, py, INLAY_MAROON);
-        continue;
-      }
-      if (d >= 52 && d <= 55) {
-        b.put(px, py, d === 52 || d === 55 ? INLAY_EDGE : INLAY);
-        continue;
-      }
       if ((wx & 31) === 31 || (wy & 31) === 31) {
         b.put(px, py, GRANITE_SEAM);
         continue;

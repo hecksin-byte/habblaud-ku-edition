@@ -93,10 +93,14 @@ export function layoutProjectRoom(room: RoomInput, theme: RoomTheme): AreaLayout
   const wallItem = (kind: FurnitureKind, cx: number, variant?: string, o: { ly?: number; on?: 'face' | 'south'; order?: number } = {}) => b.wall(kind, mir ? 16 - cx : cx, variant, o);
   const rug = (lx: number, ly: number, w: number, h: number, color: string, seed: number) => b.rug(fx(lx, w), ly, w, h, color, seed);
 
-  // ---- piso: vinil cinza de laboratório (sem tapetes de enfeite); só um capacho na entrada
-  b.floor('linoleum', 0, 0, 16, 12, room.seed);
+  // ---- piso: vinil de laboratório ou porcelanato claro, conforme o tema; o tom do tema dá identidade
+  const lab = (theme.floor ?? 'linoleum') === 'linoleum';
+  b.floor(lab ? 'linoleum' : 'marble', 0, 0, 16, 12, room.seed);
   area.floorTint = theme.carpet;
-  rug(DOOR_X - 0.25, north ? 9.5 : 2, DOOR_W + 0.5, 1.25, shade('#6e747b', -0.05), room.seed + 1);
+  // tapete na cor do tema sob a ilha (só nas salas de estilo antigo ou com rug ligado)
+  if (theme.rug) rug(1.5, 3.25, 7, 5.5, theme.carpet, room.seed);
+  // tapetinho na entrada
+  rug(DOOR_X - 0.25, north ? 9.5 : 2, DOOR_W + 0.5, 1.25, lab && !theme.rug ? shade('#6e747b', -0.05) : shade(theme.carpet2, -0.1), room.seed + 1);
 
   // ---- paredes
   if (north) {
@@ -149,8 +153,10 @@ export function layoutProjectRoom(room: RoomInput, theme: RoomTheme): AreaLayout
   }
   furn('trash_bin', 9, 6, undefined, { order: 0.7 });
   // cabideiro junto à parede (casaco, mochila, guarda-chuva) e o extintor do canto, como no laboratório de verdade
-  furn('coat_rack', 1, 5, undefined, { order: 0.27 });
-  furn('fire_extinguisher', 14, 9, undefined, { order: 0.35 });
+  if (lab) {
+    furn('coat_rack', 1, 5, undefined, { order: 0.27 });
+    furn('fire_extinguisher', 14, 9, undefined, { order: 0.35 });
+  }
 
   // ---- canto de reunião (assentos extras para subagentes: banquetas ou poltronas)
   if (v.meeting === 'table') {
@@ -170,6 +176,7 @@ export function layoutProjectRoom(room: RoomInput, theme: RoomTheme): AreaLayout
     furn('plant_small', 12, 5, pick(PLANTS_SMALL), { order: 0.47 });
   } else {
     // recanto com poltronas e puffs em volta de uma mesa de centro (sem mesa de reunião)
+    if (theme.rug) rug(9.6, 3.7, 4.8, 4.6, shade(theme.carpet2, 0.25), room.seed + 2);
     furn('coffee_table', 10, 5, undefined, { order: 0.45 });
     seat('nook', 'armchair', 9, 5, 'right', undefined, { order: 0.65 }, true);
     seat('nook', 'armchair', 12, 5, 'left', undefined, { order: 0.66 }, true);
@@ -212,6 +219,7 @@ export function layoutProjectRoom(room: RoomInput, theme: RoomTheme): AreaLayout
     switch (style) {
       case 'rest': {
         // canto de descanso: tapete, dois puffs (também servem de lugar extra) e plantas
+        if (theme.rug) rug(x0 + 0.5, 8.85, 4, 2, shade(theme.carpet, 0.35), room.seed + 3);
         seat('nook', 'beanbag', x0 + 1, 10, 'up', pick(BEANBAGS), { order: o + 0.4 });
         seat('nook', 'beanbag', x0 + 3, 10, 'up', pick(BEANBAGS), { order: o + 0.41 });
         furn('plant_small', x0 + 2, 10, pick(PLANTS_SMALL), { order: o });

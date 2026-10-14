@@ -345,6 +345,10 @@ export interface RoomTheme {
   accent: string;
   deskVariant: string;
   chairVariant: string;
+  /** Piso da sala de projeto: vinil de laboratório (padrão) ou porcelanato claro. */
+  floor?: 'linoleum' | 'marble';
+  /** Tapete na cor do tema sob a ilha e nos cantos (o estilo antigo do Habblaud). */
+  rug?: boolean;
 }
 
 /** Ícones pixel art pequenos (~8–12px) para estados acima da cabeça. */
