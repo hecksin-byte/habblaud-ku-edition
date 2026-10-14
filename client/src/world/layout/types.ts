@@ -94,6 +94,8 @@ export type SpotKind =
   | 'shelf'
   | 'window'
   | 'stall'
+  | 'urinal'
+  | 'dryer'
   | 'sink'
   | 'elevator'
   | 'talk'

@@ -1513,16 +1513,30 @@ export class Sim {
         break;
       }
       case 'bathroom': {
-        const s = this.spots.findFree('stall', { by: ch.id, rng })!;
+        // às vezes o mictório (em pé, de frente para a parede); senão a cabine
+        const urinal = rng() < 0.35 ? this.spots.findFree('urinal', { by: ch.id, rng }) : undefined;
+        const s = urinal ?? this.spots.findFree('stall', { by: ch.id, rng })!;
         if (!this.reserveTemp(ch, s)) return false;
         this.pushLeave(ch, steps);
-        steps.push({ t: 'go', tx: s.tx, ty: s.ty }, { t: 'stall', spot: s.id, ms: between(rng, 5000, 12000), phase: 0 });
+        if (urinal) {
+          goUse(s);
+          steps.push({ t: 'act', pose: 'use', ms: between(rng, 3000, 5000) });
+        } else {
+          steps.push({ t: 'go', tx: s.tx, ty: s.ty }, { t: 'stall', spot: s.id, ms: between(rng, 5000, 12000), phase: 0 });
+        }
         release(s);
         const sink = this.spots.findFree('sink', { near: { tx: s.tx, ty: s.ty }, by: ch.id });
         if (sink && this.reserveTemp(ch, sink)) {
           goUse(sink);
           steps.push({ t: 'act', pose: 'use', ms: 2200 });
           release(sink);
+          // seca as mãos no secador, se estiver livre
+          const dryer = this.spots.findFree('dryer', { near: { tx: sink.tx, ty: sink.ty }, by: ch.id });
+          if (dryer && this.reserveTemp(ch, dryer)) {
+            goUse(dryer);
+            steps.push({ t: 'act', pose: 'use', ms: 1800 });
+            release(dryer);
+          }
         }
         break;
       }

@@ -103,20 +103,28 @@ export function layoutRestroom(): AreaLayout {
   b.area.door = { x: 7, y: SOUTH_Y, w: 2, h: 2 };
 
   // pias com espelho
-  // pia comprida com espelhos lado a lado, como nos banheiros do campus
-  for (let i = 0; i < 4; i++) {
+  // pia com espelhos lado a lado, como nos banheiros do campus
+  for (let i = 0; i < 3; i++) {
     b.wall('mirror', 2.5 + i, undefined, { order: 0.3 });
     b.furn('sink', 2 + i, 2, undefined, { order: 0.35 });
     b.spot('sink', 2 + i, 3, 'up', { dy: -3 });
   }
   b.furn('trash_bin', 1, 2, undefined, { order: 0.4 });
-  b.wall('clock', 6, undefined, { order: 0.5 });
+  // secador de mãos ao lado da última pia
+  b.wall('hand_dryer', 5.5, undefined, { order: 0.31 });
+  b.spot('dryer', 5, 3, 'up', { dy: -3 });
+  b.wall('clock', 6.5, undefined, { order: 0.5 });
 
   // cabines encostadas na parede norte (entram pela porta ao sul e somem)
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 2; i++) {
     const lx = 9 + i * 2;
     const stall = b.furn('toilet_stall', lx, 2, undefined, { order: 0.3 + i * 0.05 });
     b.spot('stall', lx, 4, 'up', { furnitureId: stall, x: b.px(lx + 1), y: b.py(4) - 3, sortY: b.py(4) - 0.5 });
+  }
+  // mictórios com divisórias, junto à parede leste
+  for (const lx of [13, 14]) {
+    b.furn('urinal', lx, 2, undefined, { order: 0.3 });
+    b.spot('urinal', lx, 3, 'up', { dy: -3 });
   }
   // mural de avisos e extintor, como no corredor dos prédios do campus
   b.wall('poster', 1.5, 'ku_notice', { order: 0.5 });

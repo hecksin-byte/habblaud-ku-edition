@@ -198,6 +198,8 @@ export type FurnitureKind =
   | 'banner_stand' // 1x1 banner vinho em suporte (com o escudo do tigre)
   | 'pc_kiosk' // 1x1 quiosque de PC para uso em pé (madeira clara e moldura cinza)
   | 'glass_railing' // 1x1 guarda-corpo de vidro fosco verde com corrimão de madeira. variants: 'h' | 'v'
+  | 'urinal' // 1x1 mictório de parede com divisórias cinzas dos lados (banheiro)
+  | 'hand_dryer' // 1 tile (parede). Secador de mãos (banheiro)
   | 'display_case'; // 1 tile (parede). Vitrine de troféus: moldura branca arredondada, fundo vinho
 
 export interface FurnitureDef {
@@ -283,6 +285,8 @@ export const FURNITURE: Readonly<Record<FurnitureKind, FurnitureDef>> = {
   pc_kiosk: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
   glass_railing: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true, variants: ['h', 'v'] },
   display_case: { mount: 'wall', footprint: { w: 1, h: 0 }, blocks: false },
+  urinal: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
+  hand_dryer: { mount: 'wall', footprint: { w: 1, h: 0 }, blocks: false },
 };
 
 export type FloorKind =

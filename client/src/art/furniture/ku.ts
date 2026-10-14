@@ -429,3 +429,56 @@ export function posterKu(variant: string): { draw: (b: PixelBuf, ix: number, iy:
     },
   };
 }
+
+// ------------------------------------------------------------------ banheiro
+
+/** Mictório de parede, de porcelana branca, entre divisórias cinzas (como nos banheiros do campus). */
+export function urinal(): BufFurniture {
+  const s = floorSheet(1, 1, 14);
+  const b = s.buf;
+  const panel = ramp('#9ca3aa', 0.06);
+  const por = ramp('#f6f6f3', 0.045);
+  // divisórias laterais
+  for (const x of [0, 14]) {
+    b.rect(x, -11, 2, 21, panel.base);
+    b.vline(x, -11, 9, panel.lt);
+    b.vline(x + 1, -11, 9, panel.dk);
+    b.hline(x, x + 1, -11, '#d5dae0');
+  }
+  // placa de fundo na parede
+  b.rect(2, -9, 12, 12, '#e4e8eb');
+  // tigela
+  b.rect(4, -8, 8, 3, por.lt);
+  b.hline(4, 11, -8, por.hi);
+  b.rect(3, -5, 10, 8, por.base);
+  b.ellipse(8, 3, 5, 3, por.base);
+  b.hline(4, 11, 5, por.dk);
+  b.ellipse(8, -1, 2.5, 3.5, '#cfd8e0');
+  b.vline(8, 1, 3, '#9aa6b0');
+  // botão de descarga e cano
+  b.rect(7, -11, 2, 2, '#c9ced6');
+  b.vline(8, -9, -8, '#9aa2ae');
+  b.outline();
+  contact(b, 2, 9, 12, 3, 0.2);
+  return { base: s };
+}
+
+/** Secador de mãos de parede: caixa branca com bocal e botão. */
+export function handDryer(): BufFurniture {
+  const s = wallSheet(1);
+  const b = s.buf;
+  const x = 3;
+  const y = -22;
+  const body = ramp('#eceff1', 0.05);
+  b.rect(x, y, 10, 9, body.base);
+  b.hline(x, x + 9, y, body.hi);
+  b.vline(x + 9, y, y + 8, body.dk);
+  b.hline(x, x + 9, y + 8, body.dk);
+  b.rect(x + 3, y + 9, 4, 2, '#8d96a1');
+  b.hline(x + 3, x + 6, y + 11, '#5f6772');
+  b.rect(x + 7, y + 2, 2, 2, '#c9302c');
+  b.rect(x + 1, y + 2, 4, 1, '#c3cad4');
+  b.outline();
+  for (let yy = y + 1; yy <= y + 12; yy++) b.under(x + 10, yy, 'rgba(30,34,52,0.16)');
+  return { base: s };
+}

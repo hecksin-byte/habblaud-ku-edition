@@ -128,6 +128,10 @@ function build(kind: FurnitureKind, variant: string | undefined, state: number, 
       return C.bench();
     case 'fire_extinguisher':
       return K.fireExtinguisher();
+    case 'urinal':
+      return K.urinal();
+    case 'hand_dryer':
+      return K.handDryer();
     case 'coat_rack':
       return K.coatRack();
     case 'aed_box':
