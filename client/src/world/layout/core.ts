@@ -48,7 +48,7 @@ export function layoutReception(): AreaLayout {
   b.furn('emergency_box', 1, 3, undefined, { order: 0.3 });
   b.furn('aed_box', 1, 4, undefined, { order: 0.31 });
   b.furn('fire_extinguisher', 1, 5, undefined, { order: 0.32 });
-  b.furn('banner_stand', 5, 10, undefined, { order: 0.33 });
+  b.furn('banner_stand', 13, 10, undefined, { order: 0.33 });
   b.furn('plant_tall', 14, 4, 'ficus', { order: 0.21 });
   b.furn('reception_desk', 9, 5, undefined, { order: 0.4 });
   b.furn('plant_small', 12, 5, 'flower', { order: 0.45 });
@@ -58,6 +58,23 @@ export function layoutReception(): AreaLayout {
   b.furn('coffee_table', 10, 8, undefined, { order: 0.58 });
   b.seat('armchair', 'armchair', 12, 8, 'left', 'left', { order: 0.61 });
   b.furn('plant_tall', 14, 9, 'palm', { order: 0.22 });
+
+  // mesas de reunião comuns do hall (cadeiras dos quatro lados) e sofá de espera
+  b.furn('meeting_table', 3, 4, 'light', { order: 0.46 });
+  for (let i = 0; i < 3; i++) {
+    b.seat('cafe_seat', 'cafe_chair', 3 + i, 3, 'down', 'down', { order: 0.5 + i * 0.01 });
+    b.seat('cafe_seat', 'cafe_chair', 3 + i, 6, 'up', 'up', { order: 0.54 + i * 0.01 });
+  }
+  b.seat('cafe_seat', 'cafe_chair', 2, 4, 'right', 'right', { order: 0.57 });
+  b.seat('cafe_seat', 'cafe_chair', 6, 5, 'left', 'left', { order: 0.58 });
+  b.furn('meeting_table', 6, 7, 'dark', { order: 0.62 });
+  for (let i = 0; i < 3; i++) {
+    b.seat('cafe_seat', 'cafe_chair', 6 + i, 6, 'down', 'down', { order: 0.64 + i * 0.01 });
+    b.seat('cafe_seat', 'cafe_chair', 6 + i, 9, 'up', 'up', { order: 0.68 + i * 0.01 });
+  }
+  b.seat('cafe_seat', 'cafe_chair', 5, 8, 'right', 'right', { order: 0.71 });
+  const lobbySofa = b.furn('sofa', 10, 10, 'up', { order: 0.72 });
+  for (let i = 0; i < 3; i++) b.seat('sofa', 'sofa', 10 + i, 10, 'up', 'up', { noFurniture: true, furnitureId: lobbySofa });
 
   // banco de espera (olhando para baixo)
   const bench = b.furn('bench', 2, 7, undefined, { order: 0.5 });
@@ -69,8 +86,8 @@ export function layoutReception(): AreaLayout {
   // aberta para o corredor: guarda-corpo de vidro fosco com o escudo do tigre
   for (const lx of [1, 2, 3, 12, 13, 14]) b.furn('glass_railing', lx, 11, 'h', { order: 0.15 });
   b.walk(1, 2, 14, 10);
-  b.spot('talk', 6, 9, 'right', { group: 'talk:recepcao', dx: -1 });
-  b.spot('talk', 7, 9, 'left', { group: 'talk:recepcao', dx: 1 });
+  b.spot('talk', 12, 7, 'right', { group: 'talk:recepcao', dx: -1 });
+  b.spot('talk', 13, 7, 'left', { group: 'talk:recepcao', dx: 1 });
 
   const a = b.build();
   a.shade = undefined;
@@ -213,7 +230,8 @@ export function layoutLounge(): AreaLayout {
   const sofa = b.furn('sofa', 3, 6, 'up', { order: 0.5 });
   for (let i = 0; i < 3; i++) b.seat('sofa', 'sofa', 3 + i, 6, 'up', 'up', { noFurniture: true, furnitureId: sofa });
   b.furn('coffee_table', 3, 4, undefined, { dx: TILE / 2, order: 0.45 });
-  b.block(5, 4, 1, 1);
+  b.furn('coffee_table', 3, 5, undefined, { dx: TILE / 2, order: 0.46 });
+  b.block(5, 4, 1, 2);
   b.seat('armchair', 'armchair', 2, 4, 'right', 'right', { order: 0.55 });
   b.seat('armchair', 'armchair', 6, 4, 'left', 'left', { order: 0.56 });
 
@@ -235,21 +253,18 @@ export function layoutLounge(): AreaLayout {
   // planta baixa sob o quadro (uma alta cobriria a pintura)
   b.furn('plant_small', 1, 2, 'fern', { order: 0.2 });
   b.furn('plant_tall', 6, 2, 'palm', { order: 0.21 });
-  b.furn('printer', 5, 10, undefined, { order: 0.3 });
+  b.furn('printer', 9, 10, undefined, { order: 0.3 });
   b.furn('floor_lamp', 1, 7, undefined, { order: 0.32 });
   b.furn('plant_tall', 11, 10, 'monstera', { order: 0.22 });
   // cantinho de PCs para usar em pé (como na Open Library)
   for (const lx of [12, 13, 14]) b.furn('pc_kiosk', lx, 10, undefined, { order: 0.3 + (lx - 12) * 0.01 });
   // mesa de reunião escura com cadeiras pretas (como o canto de estudo da Open Library)
+  // duas mesas escuras emendadas (6 lugares de largura) com cadeiras pretas
   b.furn('meeting_table', 2, 9, 'dark', { order: 0.45 });
-  for (const lx of [2, 3, 4]) b.seat('cafe_seat', 'cafe_chair', lx, 8, 'down', 'down', { order: 0.5 + (lx - 2) * 0.01 });
-  b.seat('cafe_seat', 'cafe_chair', 1, 9, 'right', 'right', { order: 0.55 });
-  b.seat('cafe_seat', 'cafe_chair', 5, 9, 'left', 'left', { order: 0.56 });
-
-  // puffs
-  (['red', 'blue', 'yellow'] as const).forEach((c, i) => {
-    b.seat('beanbag', 'beanbag', 6 + i * 2, 9, 'down', c, { order: 0.6 + i * 0.02 });
-  });
+  b.furn('meeting_table', 5, 9, 'dark', { order: 0.46 });
+  for (let lx = 2; lx <= 7; lx++) b.seat('cafe_seat', 'cafe_chair', lx, 8, 'down', 'down', { order: 0.5 + (lx - 2) * 0.01 });
+  b.seat('cafe_seat', 'cafe_chair', 1, 9, 'right', 'right', { order: 0.57 });
+  b.seat('cafe_seat', 'cafe_chair', 8, 9, 'left', 'left', { order: 0.58 });
   b.spot('talk', 11, 9, 'right', { group: 'talk:lounge', dx: -1 });
   b.spot('talk', 12, 9, 'left', { group: 'talk:lounge', dx: 1 });
   // torcida do ping-pong: atrás da mesa, de frente para a câmera

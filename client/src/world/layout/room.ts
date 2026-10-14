@@ -92,6 +92,11 @@ export function layoutProjectRoom(room: RoomInput, theme: RoomTheme): AreaLayout
     b.seat(kind, fk, fx(lx), ly, fdir(dir), dirVariant ? fdir(dir) : variant, { ...o, dx: fdx(o.dx) });
   const wallItem = (kind: FurnitureKind, cx: number, variant?: string, o: { ly?: number; on?: 'face' | 'south'; order?: number } = {}) => b.wall(kind, mir ? 16 - cx : cx, variant, o);
   const rug = (lx: number, ly: number, w: number, h: number, color: string, seed: number) => b.rug(fx(lx, w), ly, w, h, color, seed);
+  /** Sofá de 3 lugares (assentos 'nook' para subagentes); 'down' olha para a câmera, 'up' fica de costas. */
+  const sofa = (lx: number, ly: number, dir: 'down' | 'up', order: number): void => {
+    const id = furn('sofa', lx, ly, dir, { order });
+    for (let i = 0; i < 3; i++) b.seat('nook', 'sofa', fx(lx + i), ly, dir, dir, { noFurniture: true, furnitureId: id });
+  };
 
   // ---- piso: vinil de laboratório ou porcelanato claro, conforme o tema; o tom do tema dá identidade
   const lab = (theme.floor ?? 'linoleum') === 'linoleum';
@@ -160,29 +165,36 @@ export function layoutProjectRoom(room: RoomInput, theme: RoomTheme): AreaLayout
 
   // ---- canto de reunião (assentos extras para subagentes: banquetas ou poltronas)
   if (v.meeting === 'table') {
-    furn('meeting_table', 10, 5, undefined, { order: 0.45 });
-    seat('stool', 'stool', 10, 4, 'down', undefined, { order: 0.65 });
-    seat('stool', 'stool', 12, 4, 'down', undefined, { order: 0.66 });
-    seat('stool', 'stool', 10, 7, 'up', undefined, { order: 0.67 });
-    seat('stool', 'stool', 12, 7, 'up', undefined, { order: 0.68 });
+    // mesa de reunião comprida com cadeiras (e não banquetas redondas) dos quatro lados
+    furn('meeting_table', 10, 5, theme.deskVariant === 'dark' ? 'dark' : 'light', { order: 0.45 });
+    for (let i = 0; i < 3; i++) {
+      seat('stool', 'cafe_chair', 10 + i, 4, 'down', undefined, { order: 0.65 + i * 0.01 }, true);
+      seat('stool', 'cafe_chair', 10 + i, 7, 'up', undefined, { order: 0.68 + i * 0.01 }, true);
+    }
+    seat('stool', 'cafe_chair', 9, 5, 'right', undefined, { order: 0.71 }, true);
+    seat('stool', 'cafe_chair', 13, 5, 'left', undefined, { order: 0.72 }, true);
+    seat('stool', 'cafe_chair', 13, 6, 'left', undefined, { order: 0.73 }, true);
   } else if (v.meeting === 'round') {
-    // duas mesinhas redondas com duas banquetas cada (em diagonal, para circular entre elas)
-    furn('cafe_table', 11, 4, undefined, { order: 0.45 });
-    seat('stool', 'stool', 10, 4, 'right', undefined, { order: 0.65 });
-    seat('stool', 'stool', 12, 4, 'left', undefined, { order: 0.66 });
-    furn('cafe_table', 11, 7, undefined, { order: 0.46 });
-    seat('stool', 'stool', 10, 7, 'right', undefined, { order: 0.67 });
-    seat('stool', 'stool', 12, 7, 'left', undefined, { order: 0.68 });
-    furn('plant_small', 12, 5, pick(PLANTS_SMALL), { order: 0.47 });
+    // dois sofás frente a frente com uma mesa de centro grande entre eles e poltronas nas pontas
+    if (theme.rug) rug(9.6, 3.7, 4.8, 4.6, shade(theme.carpet2, 0.25), room.seed + 2);
+    sofa(10, 4, 'down', 0.45);
+    furn('coffee_table', 10, 5, undefined, { order: 0.47 });
+    furn('coffee_table', 10, 6, undefined, { order: 0.48 });
+    sofa(10, 7, 'up', 0.62);
+    seat('nook', 'armchair', 9, 5, 'right', undefined, { order: 0.65 }, true);
+    seat('nook', 'armchair', 12, 5, 'left', undefined, { order: 0.66 }, true);
+    seat('nook', 'armchair', 12, 6, 'left', undefined, { order: 0.67 }, true);
+    furn('plant_small', 13, 4, pick(PLANTS_SMALL), { order: 0.5 });
   } else {
     // recanto com poltronas e puffs em volta de uma mesa de centro (sem mesa de reunião)
     if (theme.rug) rug(9.6, 3.7, 4.8, 4.6, shade(theme.carpet2, 0.25), room.seed + 2);
     furn('coffee_table', 10, 5, undefined, { order: 0.45 });
+    furn('coffee_table', 10, 6, undefined, { order: 0.46 });
     seat('nook', 'armchair', 9, 5, 'right', undefined, { order: 0.65 }, true);
     seat('nook', 'armchair', 12, 5, 'left', undefined, { order: 0.66 }, true);
-    seat('nook', 'beanbag', 10, 7, 'up', pick(BEANBAGS), { order: 0.67 });
-    seat('nook', 'beanbag', 11, 7, 'up', pick(BEANBAGS), { order: 0.68 });
-    seat('nook', 'beanbag', 11, 3, 'down', pick(BEANBAGS), { order: 0.69 });
+    seat('nook', 'armchair', 12, 6, 'left', undefined, { order: 0.67 }, true);
+    sofa(10, 7, 'up', 0.62);
+    furn('plant_small', 12, 4, pick(PLANTS_SMALL), { order: 0.5 });
   }
 
   // ---- apoio: estante na parede norte (sem cobrir quadro, placa ou janela) e coluna junto à parede
@@ -197,15 +209,15 @@ export function layoutProjectRoom(room: RoomInput, theme: RoomTheme): AreaLayout
   if (column === 0) {
     furn('binder_shelf', 14, 4, undefined, { order: 0.3 });
     furn('printer', 14, 6, undefined, { order: 0.32 });
-    furn('floor_lamp', 14, 8, undefined, { order: 0.34 });
+    furn('fridge', 14, 8, undefined, { order: 0.34 });
   } else if (column === 1) {
     furn('binder_shelf', 14, 4, undefined, { order: 0.3 });
     furn('binder_shelf', 14, 5, undefined, { order: 0.31 });
-    furn('floor_lamp', 14, 8, undefined, { order: 0.34 });
+    furn('fridge', 14, 8, undefined, { order: 0.34 });
   } else {
     furn('floor_lamp', 14, 4, undefined, { order: 0.3 });
     furn('filing_cabinet', 14, 6, undefined, { order: 0.32 });
-    furn('plant_tall', 14, 8, pick(PLANTS_TALL), { order: 0.34 });
+    furn('fridge', 14, 8, undefined, { order: 0.34 });
   }
 
   // ---- cantos da parte de baixo (linhas 9–10; a passagem da porta, colunas 6–9, fica livre)
@@ -220,10 +232,10 @@ export function layoutProjectRoom(room: RoomInput, theme: RoomTheme): AreaLayout
       case 'rest': {
         // canto de descanso: tapete, dois puffs (também servem de lugar extra) e plantas
         if (theme.rug) rug(x0 + 0.5, 8.85, 4, 2, shade(theme.carpet, 0.35), room.seed + 3);
-        seat('nook', 'beanbag', x0 + 1, 10, 'up', pick(BEANBAGS), { order: o + 0.4 });
-        seat('nook', 'beanbag', x0 + 3, 10, 'up', pick(BEANBAGS), { order: o + 0.41 });
-        furn('plant_small', x0 + 2, 10, pick(PLANTS_SMALL), { order: o });
-        furn('plant_tall', where === 'left' ? x0 : x0 + 4, 10, pick(PLANTS_TALL), { order: o + 0.01 });
+        sofa(x0, 9, 'down', o + 0.4);
+        furn('coffee_table', x0, 10, undefined, { order: o + 0.41 });
+        furn('plant_small', x0 + 3, 10, pick(PLANTS_SMALL), { order: o });
+        furn('plant_tall', x0 + 4, 9, pick(PLANTS_TALL), { order: o + 0.01 });
         return;
       }
       case 'print': {
@@ -240,21 +252,20 @@ export function layoutProjectRoom(room: RoomInput, theme: RoomTheme): AreaLayout
         furn('plant_tall', x0, 10, pick(PLANTS_TALL), { order: o });
         furn('floor_lamp', x0 + 1, 10, undefined, { order: o + 0.01 });
         seat('nook', 'armchair', x0 + 2, 10, 'up', undefined, { order: o + 0.4 }, true);
-        furn('plant_small', x0 + 3, 10, pick(PLANTS_SMALL), { order: o + 0.02 });
-        furn('plant_tall', x0 + 4, 10, pick(PLANTS_TALL), { order: o + 0.03 });
+        furn('bookshelf', x0 + 3, 10, undefined, { order: o + 0.02 });
         return;
       }
       case 'standdesk': {
         // mesa de pé com notebook (lugar de trabalho em pé, de frente para a câmera)
         furn('cafe_table', x0 + 2, 10, undefined, { order: o });
         spot('stand', x0 + 2, 9, 'down', { dy: -1 });
-        furn('plant_small', x0 + 4, 10, pick(PLANTS_SMALL), { order: o + 0.01 });
+        furn('bookshelf', x0 + 3, 10, undefined, { order: o + 0.01 });
         furn('trash_bin', x0, 10, undefined, { order: o + 0.02 });
         return;
       }
       case 'stands': {
         // pontos em pé junto ao quadro móvel/estante baixa
-        furn('filing_cabinet', x0 + 4, 10, undefined, { order: o });
+        furn('bookshelf', x0 + 3, 10, undefined, { order: o });
         furn('plant_small', x0, 10, pick(PLANTS_SMALL), { order: o + 0.01 });
         spot('stand', x0 + 1, 9, 'up', { dy: -2 });
         spot('stand', x0 + 2, 9, 'up', { dy: -2 });
