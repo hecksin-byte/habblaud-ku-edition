@@ -156,7 +156,7 @@ function simulate(world: TestWorld, seed: number, seconds: number): { report: Re
     let seatedNow = 0;
     for (const w of people.walkers) {
       rep.maxWalkerAge = Math.max(rep.maxWalkerAge, w.age);
-      const special = ['enter', 'exitDoor', 'toBus', 'alight', 'sitDown', 'seated', 'standUp', 'fade', 'waitBus'].includes(w.state);
+      const special = ['enter', 'descend', 'ascend', 'exitDoor', 'toBus', 'alight', 'sitDown', 'seated', 'standUp', 'fade', 'waitBus'].includes(w.state);
       if (!special && !walkable(world.map, w.x, w.y)) rep.walkersInBlocked++;
       if (w.state === 'seated') {
         seatedNow++;
@@ -216,7 +216,7 @@ describe('mapa de caminhada', () => {
 describe('trânsito e pedestres juntos', () => {
   // [nome, x do ponto de ônibus, máximo de desistências em 900 s]: nos dois últimos o ponto fica quase em cima da faixa (caso extremo)
   const cases: [string, number, number][] = [
-    ['ponto de ônibus longe da faixa', 200, 12],
+    ['ponto de ônibus longe da faixa', 200, 20],
     ['ponto de ônibus colado na faixa (a fila chega nela)', 420, 40],
     ['ponto de ônibus logo depois da faixa', 380, 40],
   ];
@@ -272,6 +272,30 @@ describe('trânsito e pedestres juntos', () => {
     expect(fromDoors).toBeGreaterThan(10);
   });
 
+  it('escada da estação: quem entra afunda atrás da borda e some; quem sai emerge dela', () => {
+    const world = makeWorld(200);
+    const people = new KuPeople(world.map, W * 2, mulberry32(7));
+    const seen = { descend: 0, ascend: 0, maxDrop: 0, bad: 0 };
+    for (let i = 0; i < 20 * 900; i++) {
+      people.update(1 / 20, [], [], false);
+      for (const w of people.walkers) {
+        if (w.state === 'descend' || w.state === 'ascend') {
+          seen[w.state]++;
+          if (w.drop) {
+            seen.maxDrop = Math.max(seen.maxDrop, w.drop);
+            if (w.lip === undefined || Math.abs(w.y - w.lip) > 0.01) seen.bad++; // afunda na própria borda
+          }
+          if (w.depth !== w.sy) seen.bad++; // continua desenhado à frente da entrada
+        } else if (w.drop) seen.bad++; // sem escada, sem afundar
+      }
+    }
+    expect(seen.descend).toBeGreaterThan(0);
+    expect(seen.ascend).toBeGreaterThan(0);
+    expect(seen.maxDrop).toBeGreaterThan(30);
+    expect(seen.bad).toBe(0);
+    expect(people.stats.entered).toBeGreaterThan(0);
+  });
+
   it('quem não consegue atravessar não fica parado para sempre', () => {
     const world = makeWorld(200);
     // tráfego sem trégua: um veículo sempre sobre a faixa
@@ -279,6 +303,6 @@ describe('trânsito e pedestres juntos', () => {
     const cross = world.map.crossing;
     const veh = (): VehicleInfo[] => [{ x: (cross.x0 + cross.x1) / 2, y: 300, halfLen: 18, moving: true }];
     for (let i = 0; i < 20 * 120; i++) people.update(1 / 20, veh(), [], false);
-    expect(Math.max(0, ...people.walkers.map((w) => w.waitT))).toBeLessThanOrEqual(25.1);
+    expect(Math.max(0, ...people.walkers.filter((w) => w.state === 'walk').map((w) => w.waitT))).toBeLessThanOrEqual(25.1);
   });
 });

@@ -40,6 +40,10 @@ export interface UiContext {
   readonly root: HTMLElement;
   readonly prefs: Readonly<UiPrefs>;
   updatePrefs(patch: Partial<UiPrefs>): void;
+  /** Arquiva a sessão do agente: some da tela (a sessão não é tocada) e dá para trazer de volta nas configurações. */
+  archiveAgent(agent: AgentInfo): void;
+  /** Traz de volta um arquivado (chave da sessão) ou, sem argumento, todos. */
+  restoreArchived(key?: string): void;
   /** Relógio do servidor (corrige a diferença entre o relógio local e o do servidor). */
   now(): number;
   account(id: string): AccountInfo | undefined;

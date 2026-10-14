@@ -26,7 +26,8 @@ import { hasCodexPermission } from './provider';
 import { Notifier } from './notify';
 import { ConnectionBanner, EmptyState, Splash } from './overlays';
 import { focusPermission, nextPermissionAgent } from './permission';
-import { loadPrefs, safeLocalStorage, savePrefs, worldOptionsFrom, type UiPrefs } from './prefs';
+import { hideFilterFrom, loadPrefs, safeLocalStorage, savePrefs, worldOptionsFrom, type UiPrefs } from './prefs';
+import { sessionKey, type ArchivedEntry } from '../net/hidden';
 import { SettingsPopover } from './settings';
 import { Sidebar } from './sidebar';
 import { SoundControl } from './sound';
@@ -85,7 +86,22 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi)
       prefs = { ...prefs, ...patch };
       savePrefs(storage, prefs);
       world.setOptions(worldOptionsFrom(prefs));
+      store.setViewFilter(hideFilterFrom(prefs));
       invalidate();
+    },
+    archiveAgent(agent) {
+      const key = sessionKey(agent);
+      if (prefs.archived.some((e) => e.key === key)) return;
+      const room = store.room(agent.roomId)?.name ?? agent.roomId;
+      const entry: ArchivedEntry = { key, name: agent.name, room, at: Date.now() };
+      if (selection?.type === 'agent' && selection.id === agent.id) ctx.select(null);
+      ctx.updatePrefs({ archived: [entry, ...prefs.archived] });
+      ctx.announce(tr('{0} foi arquivado. Dá para trazer de volta em Configurações.', [agent.name]));
+    },
+    restoreArchived(key) {
+      const left = key ? prefs.archived.filter((e) => e.key !== key) : [];
+      ctx.updatePrefs({ archived: left });
+      ctx.announce(key ? tr('Agente trazido de volta.') : tr('Todos os agentes arquivados voltaram.'));
     },
     now: () => timelapse?.replayTime ?? Date.now() + skew,
     account: (id) => store.snapshot?.accounts.find((a) => a.id === id),
@@ -147,6 +163,9 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi)
     },
     isTimelapseOpen: () => timelapse.isOpen,
   };
+
+  // O que está arquivado ou parado há dias já sai da tela no primeiro snapshot.
+  store.setViewFilter(hideFilterFrom(prefs));
 
   // ---------------------------------------------------------------- componentes
   const sound = new SoundControl(ctx);

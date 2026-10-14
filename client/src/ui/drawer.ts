@@ -21,7 +21,8 @@ import {
   relativeTime,
   shortPath,
 } from './format';
-import { ICONS } from './icons';
+import { ARCHIVE_ICON, ICONS } from './icons';
+import { canArchive } from '../net/hidden';
 import {
   accountsOf,
   activityFallback,
@@ -214,6 +215,8 @@ class AgentView {
   private statusText: HTMLElement;
   private statusSince: HTMLElement;
   private followBtn: HTMLButtonElement;
+  /** Arquivar o agente (só os principais que terminaram: parados, concluídos ou desconectados). */
+  private archiveBtn: HTMLButtonElement;
   private termBtn: HTMLButtonElement;
   private termLabel: HTMLElement;
   /** Por que o terminal não abre: no celular não há hover para ler o title, então o toque mostra o motivo aqui. */
@@ -299,11 +302,25 @@ class AgentView {
     const centerBtn = h('button', { class: 'ui-btn', type: 'button', title: tr('Levar a câmera até o agente'), on: { click: () => ctx.focusSelection() } });
     centerBtn.innerHTML = ICONS.center;
     centerBtn.append(h('span', { text: tr('Centralizar') }));
+    this.archiveBtn = h('button', {
+      class: 'ui-btn',
+      type: 'button',
+      hidden: true,
+      title: tr('Tira este agente do escritório. A sessão não é tocada, e dá para trazê-lo de volta em Configurações.'),
+      on: {
+        click: () => {
+          const a = this.agentId ? ctx.agent(this.agentId) : undefined;
+          if (a) ctx.archiveAgent(a);
+        },
+      },
+    });
+    this.archiveBtn.innerHTML = ARCHIVE_ICON;
+    this.archiveBtn.append(h('span', { text: tr('Arquivar') }));
     const statusRow = h(
       'div',
       { class: 'ui-status' },
       h('span', { class: 'ui-status__label' }, this.dot, this.statusText, this.statusSince),
-      h('span', { class: 'ui-status__actions' }, this.followBtn, centerBtn),
+      h('span', { class: 'ui-status__actions' }, this.followBtn, centerBtn, this.archiveBtn),
     );
 
     // Terminal: a conversa da sessão como o Claude Code mostra, ao vivo (só com acesso local).
@@ -565,6 +582,7 @@ class AgentView {
     const following = this.ctx.world.getOptions().followSelected;
     setAttr(this.followBtn, 'aria-pressed', String(following));
     this.followBtn.classList.toggle('is-on', following);
+    setHidden(this.archiveBtn, !(live && canArchive(a)));
     this.renderTerminalButton(!!live);
 
     // Alerta.

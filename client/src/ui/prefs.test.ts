@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_PREFS, loadPrefs, migrateLegacyKeys, PREFS_KEY, sanitizePrefs, savePrefs, worldOptionsFrom } from './prefs';
+import { DEFAULT_PREFS, hideFilterFrom, loadPrefs, migrateLegacyKeys, PREFS_KEY, sanitizePrefs, savePrefs, worldOptionsFrom } from './prefs';
 
 function memoryStorage(initial: Record<string, string> = {}) {
   const data = new Map(Object.entries(initial));
@@ -121,5 +121,27 @@ describe('migração do nome antigo (CodeTown)', () => {
     };
     expect(migrateLegacyKeys(full)).toBe(0);
     expect(Object.fromEntries(full.data)).toEqual({ 'codetown:prefs': '{}' });
+  });
+});
+
+describe('arquivados e parados há dias', () => {
+  it('sanitizePrefs valida hideIdleDays e a lista de arquivados', () => {
+    const p = sanitizePrefs({
+      hideIdleDays: 3,
+      archived: [{ key: '.claude|s1', name: 'Ana', room: 'loja', at: 5 }, { key: '.claude|s1', name: 'repetido' }, { nome: 'sem chave' }, 7, { key: '.claude|s2', name: 3 }],
+    });
+    expect(p.hideIdleDays).toBe(3);
+    expect(p.archived).toEqual([
+      { key: '.claude|s1', name: 'Ana', room: 'loja', at: 5 },
+      { key: '.claude|s2', name: '', room: '', at: 0 },
+    ]);
+    expect(sanitizePrefs({ hideIdleDays: 5 }).hideIdleDays).toBe(0);
+    expect(sanitizePrefs({}).archived).toEqual([]);
+  });
+
+  it('hideFilterFrom monta o filtro do escritório', () => {
+    const f = hideFilterFrom({ ...DEFAULT_PREFS, hideIdleDays: 7, archived: [{ key: 'a|b', name: '', room: '', at: 0 }] });
+    expect(f.idleDays).toBe(7);
+    expect(f.archived.has('a|b')).toBe(true);
   });
 });

@@ -303,6 +303,9 @@ export const ICONS = {
 
 export type IconKey = keyof typeof ICONS;
 
+/** Caixa de arquivo (botão "Arquivar" do agente). */
+export const ARCHIVE_ICON = pixelIcon(['########', '#......#', '########', '.#....#.', '.#.##.#.', '.#....#.', '.######.']);
+
 /** Marca do Habblaud em pixels (usada quando /assets/brand/logo-mark.png não existe): prédio com janelas acesas. */
 export const FALLBACK_MARK = pixelIcon(
   [

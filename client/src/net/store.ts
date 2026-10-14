@@ -8,6 +8,7 @@ import type { AppearanceParts } from '../../../shared/appearance';
 import type { Activity, AgentDetail, AgentInfo, FeedItem, Notice, OfficeSnapshot, OutboxMessage, PermissionDecision, PermissionRequestInfo, RoomInfo } from '../../../shared/types';
 import { DemoSimulator } from '../../../shared/demo/simulator';
 import { tr } from '../../../shared/i18n';
+import { filterSnapshot, NO_HIDE, type HideFilter } from './hidden';
 
 export type ConnectionState = 'connecting' | 'open' | 'closed' | 'mock';
 
@@ -110,6 +111,11 @@ export class OfficeStore {
   /** Timelapse ligado: `snapshot` é o reconstruído; o último ao vivo fica em `live` (com a hora em que chegou). */
   private replay = false;
   private live: { snap: OfficeSnapshot; at: number } | null = null;
+  /** Agentes tirados da tela (arquivados ou parados há dias): só a visão muda; `raw` é o que o servidor mandou. */
+  private hideFilter: HideFilter = NO_HIDE;
+  private raw: OfficeSnapshot | null = null;
+  /** Quantos agentes principais o filtro escondeu no último snapshot. */
+  hidden = { archived: 0, idle: 0 };
 
   constructor(opts: StoreOptions = {}) {
     this.mock = !!opts.mock;
@@ -375,12 +381,35 @@ export class OfficeStore {
     this.emit('connection', state);
   }
 
-  private applySnapshot(snap: OfficeSnapshot): void {
+  private applySnapshot(received: OfficeSnapshot): void {
     const cur = this.replay ? this.live?.snap : this.snapshot;
-    if (cur && snap.rev < cur.rev && snap.meta.startedAt === cur.meta.startedAt) return;
+    if (cur && received.rev < cur.rev && received.meta.startedAt === cur.meta.startedAt) return;
+    this.raw = received;
+    const snap = this.view(received);
     if (this.replay) this.live = { snap, at: Date.now() };
     else this.setSnapshot(snap);
-    this.checkBuild(snap.meta.build);
+    this.checkBuild(received.meta.build);
+  }
+
+  private view(snap: OfficeSnapshot): OfficeSnapshot {
+    const r = filterSnapshot(snap, this.hideFilter);
+    this.hidden = { archived: r.archived, idle: r.idle };
+    return r.snap;
+  }
+
+  /** Muda o que fica escondido (arquivados, parados há dias) e refaz a tela na hora. O que o servidor mandou não muda. */
+  setViewFilter(f: HideFilter): void {
+    this.hideFilter = f;
+    if (!this.raw) return;
+    const snap = this.view(this.raw);
+    if (this.replay) {
+      if (this.live) this.live = { snap, at: this.live.at };
+    } else this.setSnapshot(snap);
+  }
+
+  /** Os agentes principais do último snapshot do servidor, escondidos ou não (para a lista de arquivados). */
+  get rawAgents(): readonly AgentInfo[] {
+    return this.raw?.agents ?? [];
   }
 
   private setSnapshot(snap: OfficeSnapshot): void {

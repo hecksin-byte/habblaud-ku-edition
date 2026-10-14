@@ -1157,8 +1157,17 @@ export class Renderer {
     const sp = this.people!.sprite(w);
     const shadow = shadowSprite();
     if (w.alpha < 1) this.ctx.globalAlpha = Math.max(0, w.alpha);
-    this.ctx.drawImage(shadow.canvas, Math.round(w.x - shadow.ax), Math.round(w.y - shadow.ay));
-    this.ctx.drawImage(sp.canvas, Math.round(w.x - sp.ax), Math.round(w.y - sp.ay));
+    const down = w.lip !== undefined && w.drop ? w.drop : 0;
+    if (down) {
+      // escada da estação: o que passa da borda fica escondido (a pessoa afunda no chão)
+      this.ctx.save();
+      this.ctx.beginPath();
+      this.ctx.rect(w.x - 40, w.y - 90, 80, w.lip! - (w.y - 90));
+      this.ctx.clip();
+    }
+    this.ctx.drawImage(shadow.canvas, Math.round(w.x - shadow.ax), Math.round(w.y + down - shadow.ay));
+    this.ctx.drawImage(sp.canvas, Math.round(w.x - sp.ax), Math.round(w.y + down - sp.ay));
+    if (down) this.ctx.restore();
     this.ctx.globalAlpha = 1;
   }
 

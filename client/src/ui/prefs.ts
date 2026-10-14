@@ -1,5 +1,6 @@
 // Preferências da interface, persistidas em localStorage ('habblaud:prefs').
 // Puro: o armazenamento é injetado (testável em node).
+import { IDLE_HIDE_DAYS, type ArchivedEntry, type HideFilter, type IdleHideDays } from '../net/hidden';
 import { DEFAULT_SOUND_SETTINGS, sanitizeSoundSettings, type SoundSettings } from '../audio/scheduler';
 import type { DaylightMode, WorldOptions } from '../world/api';
 import { DEFAULT_WORLD_OPTIONS } from '../world/api';
@@ -23,6 +24,10 @@ export interface UiPrefs {
   feedOpen: boolean;
   /** Contas ocultas na barra lateral (AccountInfo.id). */
   hiddenAccounts: string[];
+  /** Ocultar da tela os agentes parados há N dias ou mais (0 = nunca). A sessão não é tocada. */
+  hideIdleDays: IdleHideDays;
+  /** Agentes arquivados pelo botão do agente (só somem da tela; dá para trazer de volta nas configurações). */
+  archived: ArchivedEntry[];
 }
 
 export const DEFAULT_PREFS: UiPrefs = {
@@ -37,7 +42,38 @@ export const DEFAULT_PREFS: UiPrefs = {
   sidebarOpen: true,
   feedOpen: true,
   hiddenAccounts: [],
+  hideIdleDays: 0,
+  archived: [],
 };
+
+const MAX_ARCHIVED = 300;
+
+function sanitizeArchived(raw: unknown): ArchivedEntry[] {
+  if (!Array.isArray(raw)) return [];
+  const out: ArchivedEntry[] = [];
+  for (const e of raw) {
+    if (!e || typeof e !== 'object') continue;
+    const o = e as Record<string, unknown>;
+    if (typeof o.key !== 'string' || !o.key || out.some((x) => x.key === o.key)) continue;
+    out.push({
+      key: o.key.slice(0, 300),
+      name: typeof o.name === 'string' ? o.name.slice(0, 80) : '',
+      room: typeof o.room === 'string' ? o.room.slice(0, 120) : '',
+      at: typeof o.at === 'number' && Number.isFinite(o.at) ? o.at : 0,
+    });
+    if (out.length >= MAX_ARCHIVED) break;
+  }
+  return out;
+}
+
+function sanitizeIdleDays(raw: unknown): IdleHideDays {
+  return (IDLE_HIDE_DAYS as readonly unknown[]).includes(raw) ? (raw as IdleHideDays) : 0;
+}
+
+/** O filtro do escritório (net/hidden.ts) a partir das preferências. */
+export function hideFilterFrom(p: UiPrefs): HideFilter {
+  return { archived: new Set(p.archived.map((e) => e.key)), idleDays: p.hideIdleDays };
+}
 
 type StorageLike = Pick<Storage, 'getItem' | 'setItem'>;
 
@@ -62,6 +98,8 @@ export function sanitizePrefs(raw: unknown): UiPrefs {
     sidebarOpen: bool(o.sidebarOpen, d.sidebarOpen),
     feedOpen: bool(o.feedOpen, d.feedOpen),
     hiddenAccounts: Array.isArray(o.hiddenAccounts) ? o.hiddenAccounts.filter((x): x is string => typeof x === 'string').slice(0, 20) : [],
+    hideIdleDays: sanitizeIdleDays(o.hideIdleDays),
+    archived: sanitizeArchived(o.archived),
   };
 }
 

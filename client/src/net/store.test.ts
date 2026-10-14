@@ -324,3 +324,53 @@ describe('personagem do projeto (store)', () => {
     expect(fetchMock.mock.calls.length).toBe(calls);
   });
 });
+
+describe('OfficeStore: agentes arquivados e parados há dias', () => {
+  const DAY = 86_400_000;
+  const mk = (rev: number): OfficeSnapshot =>
+    ({
+      rev,
+      serverTime: 10 * DAY,
+      rooms: [{ id: 'r1' }, { id: 'r2' }],
+      agents: [
+        { id: 'a', roomId: 'r1', account: '.c', sessionId: 's1', status: 'idle', lastEventAt: 0 },
+        { id: 'b', roomId: 'r2', account: '.c', sessionId: 's2', status: 'working', lastEventAt: 10 * DAY },
+      ],
+      accounts: [],
+      meta: { demo: false, sources: [], startedAt: 1, version: '0' },
+    }) as unknown as OfficeSnapshot;
+  const apply = (store: OfficeStore, s: OfficeSnapshot) => (store as unknown as { applySnapshot(s: OfficeSnapshot): void }).applySnapshot(s);
+
+  it('o filtro vale para os próximos snapshots e muda a tela na hora, sem perder o que o servidor mandou', () => {
+    const store = new OfficeStore();
+    const seen: string[][] = [];
+    store.on('snapshot', (s) => seen.push(s.agents.map((a) => a.id)));
+    apply(store, mk(1));
+    expect(store.snapshot?.agents.map((a) => a.id)).toEqual(['a', 'b']);
+
+    store.setViewFilter({ archived: new Set(['.c|s1']), idleDays: 0 });
+    expect(store.snapshot?.agents.map((a) => a.id)).toEqual(['b']);
+    expect(store.snapshot?.rooms.map((r) => r.id)).toEqual(['r2']);
+    expect(store.hidden).toEqual({ archived: 1, idle: 0 });
+    expect(store.rawAgents.map((a) => a.id)).toEqual(['a', 'b']);
+
+    apply(store, mk(2)); // um snapshot novo continua filtrado
+    expect(store.snapshot?.agents.map((a) => a.id)).toEqual(['b']);
+
+    store.setViewFilter({ archived: new Set(), idleDays: 3 }); // sem arquivar: o 'a' está parado há 10 dias
+    expect(store.snapshot?.agents.map((a) => a.id)).toEqual(['b']);
+    expect(store.hidden).toEqual({ archived: 0, idle: 1 });
+
+    store.setViewFilter({ archived: new Set(), idleDays: 0 }); // trazido de volta
+    expect(store.snapshot?.agents.map((a) => a.id)).toEqual(['a', 'b']);
+    expect(seen.at(-1)).toEqual(['a', 'b']);
+  });
+
+  it('antes do primeiro snapshot, só guarda o filtro', () => {
+    const store = new OfficeStore();
+    store.setViewFilter({ archived: new Set(['.c|s1']), idleDays: 0 });
+    expect(store.snapshot).toBeNull();
+    apply(store, mk(1));
+    expect(store.snapshot?.agents.map((a) => a.id)).toEqual(['b']);
+  });
+});

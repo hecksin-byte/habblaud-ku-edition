@@ -1,5 +1,6 @@
 // Configurações (popover): opções do escritório, avisos, modo demonstração e Sobre (versão).
 import { access, remoteLogout } from '../net/access';
+import type { IdleHideDays } from '../net/hidden';
 import type { UiComponent, UiContext } from './context';
 import { h, iconButton, setAttr, setHidden, setText } from './dom';
 import { ICONS } from './icons';
@@ -90,6 +91,12 @@ export class SettingsPopover implements UiComponent {
   private language: ReturnType<typeof segmented<LanguageChoice>>;
   private soundGroup: SoundSettingsGroup;
   private demoGroup: HTMLElement;
+  /** Ocultar parados há dias e a lista de arquivados (net/hidden.ts): só a tela muda, a sessão não é tocada. */
+  private hideIdle: ReturnType<typeof segmented<string>>;
+  private hideSummary: HTMLElement;
+  private archivedList: HTMLElement;
+  private archivedKey = '';
+  private restoreAll: HTMLButtonElement;
   /** Só no Windows e pelo próprio computador: ligar/desligar a tarefa agendada que sobe o servidor (GET/POST /api/autostart). */
   private autostartGroup: HTMLElement;
   private autostartSw: SwitchRefs;
@@ -160,6 +167,30 @@ export class SettingsPopover implements UiComponent {
       h('span', { class: 'ui-set__hint', text: tr('Os textos das atividades vêm do servidor: seguem HABBLAUD_LANG ou o idioma do sistema onde o Habblaud roda (o inglês, só com HABBLAUD_LANG=en).') }),
     );
 
+    this.hideIdle = segmented<string>(
+      tr('Ocultar agentes parados há'),
+      [
+        ['0', tr('Nunca')],
+        ['1', tr('1 dia')],
+        ['3', tr('3 dias')],
+        ['7', tr('7 dias')],
+      ],
+      (v) => ctx.updatePrefs({ hideIdleDays: Number(v) as IdleHideDays }),
+    );
+    this.hideIdle.row.append(
+      h('span', { class: 'ui-set__hint', text: tr('Só tira da tela: a sessão não é tocada e o agente volta sozinho quando fizer algo de novo.') }),
+    );
+    this.hideSummary = h('span', { class: 'ui-set__hint' });
+    this.archivedList = h('ul', { class: 'ui-archived' });
+    this.restoreAll = h('button', { class: 'ui-btn', type: 'button', text: tr('Trazer todos de volta'), on: { click: () => ctx.restoreArchived() } }) as HTMLButtonElement;
+    const hideGroup = h(
+      'div',
+      { class: 'ui-set-group' },
+      h('h3', { text: tr('Arquivados e ocultos') }),
+      this.hideIdle.row,
+      h('div', { class: 'ui-set ui-set--stack' }, h('span', { class: 'ui-set__label', text: tr('Agentes arquivados') }), this.hideSummary, this.archivedList, this.restoreAll),
+    );
+
     this.demoGroup = h(
       'div',
       { class: 'ui-set-group' },
@@ -218,6 +249,7 @@ export class SettingsPopover implements UiComponent {
       ),
       this.soundGroup.el,
       h('div', { class: 'ui-set-group' }, h('h3', { text: tr('Idioma') }), this.language.row),
+      hideGroup,
       this.demoGroup,
       this.autostartGroup,
       this.remoteGroup,
@@ -289,6 +321,7 @@ export class SettingsPopover implements UiComponent {
       setAttr(r.btn, 'aria-checked', String(on));
       r.btn.disabled = key === 'demo' && this.demoBusy;
     }
+    this.renderHidden();
     this.bubbles.set(p.bubbles);
     this.liveliness.set(p.liveliness);
     this.daylight.set(p.daylight);
@@ -319,6 +352,34 @@ export class SettingsPopover implements UiComponent {
     const state = await this.notifier.enableBrowserNotifications();
     this.ctx.updatePrefs({ browserNotifications: state === 'granted' });
     if (state === 'denied') this.ctx.announce(tr('Notificações bloqueadas pelo navegador.'));
+  }
+
+  /** "Ocultar parados há N dias" e a lista de arquivados, com o botão de trazer de volta. */
+  private renderHidden(): void {
+    const p = this.ctx.prefs;
+    this.hideIdle.set(String(p.hideIdleDays));
+    const hidden = this.ctx.store.hidden;
+    const parts: string[] = [];
+    if (p.hideIdleDays) parts.push(tr('{0} parados ocultos agora', [hidden.idle]));
+    parts.push(tr('{0} arquivados', [p.archived.length]));
+    setText(this.hideSummary, parts.join(' · '));
+    const key = p.archived.map((e) => e.key).join('\n');
+    if (key !== this.archivedKey) {
+      this.archivedKey = key;
+      this.archivedList.replaceChildren(
+        ...p.archived.map((e) =>
+          h(
+            'li',
+            { class: 'ui-archived__row' },
+            h('span', { class: 'ui-archived__name', text: e.name || e.key.split('|')[1]?.slice(0, 8) || e.key }),
+            h('span', { class: 'ui-archived__room', text: e.room }),
+            h('button', { class: 'ui-btn ui-btn--sm', type: 'button', text: tr('Trazer de volta'), on: { click: () => this.ctx.restoreArchived(e.key) } }),
+          ),
+        ),
+      );
+    }
+    setHidden(this.archivedList, !p.archived.length);
+    setHidden(this.restoreAll, !p.archived.length);
   }
 
   private paintAutostart(): void {

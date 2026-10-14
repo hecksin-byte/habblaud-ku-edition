@@ -43,6 +43,7 @@ export class Sidebar implements UiComponent {
   private filters: HTMLElement;
   private filterList: KeyedList<AccountInfo, HTMLButtonElement>;
   private scroller: HTMLElement;
+  private hiddenNote: HTMLButtonElement;
   private rooms: KeyedList<RoomGroup>;
   private roomRefs = new WeakMap<HTMLElement, RoomRefs>();
   private nodeRefs = new WeakMap<HTMLElement, NodeRefs>();
@@ -127,6 +128,9 @@ export class Sidebar implements UiComponent {
     });
     this.empty = h('div', { class: 'ui-side__empty', hidden: true }, this.emptyText, this.clearBtn);
     this.scroller.append(this.empty);
+    // Quantos agentes estão fora da tela (arquivados ou parados há dias) e um atalho para as configurações.
+    this.hiddenNote = h('button', { class: 'ui-link-btn ui-side__hidden', type: 'button', hidden: true, on: { click: () => ctx.toggleSettings() } }) as HTMLButtonElement;
+    this.scroller.append(this.hiddenNote);
 
     const close = iconButton(ICONS.close, tr('Fechar painel lateral'), () => ctx.togglePanel('sidebar', false), 'ui-side__close');
     this.el = h(
@@ -159,6 +163,9 @@ export class Sidebar implements UiComponent {
     // Escritório vazio sem filtro: o cartão central já explica; a lista não repete o aviso.
     const showEmpty = groups.length === 0 && (filtering || !officeIsEmpty(this.ctx));
     setHidden(this.empty, !showEmpty);
+    const out = this.ctx.store.hidden.archived + this.ctx.store.hidden.idle;
+    setHidden(this.hiddenNote, out === 0);
+    if (out) setText(this.hiddenNote, tr('{0} agentes fora da tela (arquivados ou parados há dias) · gerenciar', [out]));
     if (showEmpty) {
       setText(
         this.emptyText,

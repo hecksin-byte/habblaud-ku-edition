@@ -313,6 +313,9 @@ export interface Walker {
   pose: 'stand' | 'crouch' | 'sit';
   /** Linha usada para ordenar com os demais objetos (y dos pés; sentado, um pouco à frente do banco). */
   depth: number;
+  /** Escada da estação: o corpo afunda `drop` px abaixo da borda `lip` (y), e o que passa dela fica escondido. */
+  drop?: number;
+  lip?: number;
 }
 
 type Goal =
@@ -322,7 +325,7 @@ type Goal =
   | { k: 'bus'; stop: BusStop }
   | { k: 'leave'; x: number; y: number };
 
-type State = 'walk' | 'idle' | 'enter' | 'exitDoor' | 'sitDown' | 'seated' | 'standUp' | 'waitBus' | 'toBus' | 'fade' | 'alight';
+type State = 'walk' | 'idle' | 'enter' | 'descend' | 'ascend' | 'exitDoor' | 'sitDown' | 'seated' | 'standUp' | 'waitBus' | 'toBus' | 'fade' | 'alight';
 
 interface Seat {
   bench: KuBench;
@@ -348,6 +351,8 @@ export interface WalkerState extends Walker {
   seat: Seat | null;
   dead: boolean;
   age: number;
+  /** y da porta da estação, de onde a escada começa. */
+  sy: number;
 }
 
 export interface PeopleStats {
@@ -361,6 +366,12 @@ export interface PeopleStats {
   crossingsDuringDwell: number;
   gaveUp: number;
 }
+
+/** Escada da estação: anda até a borda da escada, desce afundando (altura do corpo) e some; a subida faz o inverso. */
+const STAIR_UP = 16;
+const STAIR_DEPTH = 32;
+const STAIR_WALK = 0.8;
+const STAIR_SINK = 1.4;
 
 const SEAT_FEET = 12;
 /** O sprite do banco usa a profundidade bench.y + 14 (sua linha de apoio); quem senta fica 0,6 px à frente. */
@@ -418,6 +429,7 @@ export class KuPeople {
       direct: null,
       seat: null,
       dead: false,
+      sy: y,
       age: 0,
     };
   }
@@ -462,9 +474,18 @@ export class KuPeople {
       const door = this.pick(m.doors);
       const station = door.id.startsWith('station');
       const kind: Kind = station ? (this.rnd() < 0.4 ? 'student' : this.rnd() < 0.5 ? 'worker' : 'citizen') : this.rnd() < 0.7 ? 'student' : this.rnd() < 0.4 ? 'worker' : 'citizen';
-      const w = this.makeWalker(door.x, door.y - 6, kind);
-      w.state = 'exitDoor';
+      const stairs = door.id.startsWith('station');
+      const w = this.makeWalker(door.x, stairs ? door.y - STAIR_UP : door.y - 6, kind);
+      w.state = stairs ? 'ascend' : 'exitDoor';
       w.t = 0;
+      if (stairs) {
+        // sobe a escada: começa afundado na borda e vai emergindo
+        w.sy = door.y;
+        w.alpha = 1;
+        w.depth = door.y;
+        w.lip = w.y;
+        w.drop = STAIR_DEPTH;
+      }
       w.goals = this.plan(door.id);
       this.walkers.push(w);
       this.stats.spawned++;
@@ -519,7 +540,7 @@ export class KuPeople {
     const cx = (c.x0 + c.x1) / 2;
     const half = (c.x1 - c.x0) / 2;
     // veículo com o corpo sobre a faixa sempre impede; na fase dos veículos, os que esperam para passar também (mesmo parados)
-    const onZone = (v: VehicleInfo) => Math.min(v.x + v.halfLen, c.x1) - Math.max(v.x - v.halfLen, c.x0) > 4;
+    const onZone = (v: VehicleInfo) => Math.min(v.x + v.halfLen, c.x1) - Math.max(v.x - v.halfLen, c.x0) > 2; // o mesmo limiar do carro: com a frente a mais de 2 px dentro da faixa ele já não consegue parar
     return vehicles.some((v) => onZone(v) || (!this.phase && Math.abs(v.x - cx) < v.halfLen + half + 64));
   }
 
@@ -633,8 +654,13 @@ export class KuPeople {
       w.state = 'idle';
       w.t = g.pause;
     } else if (g.k === 'door') {
-      w.state = 'enter';
       w.t = 0;
+      if (g.door.id.startsWith('station')) {
+        // escada da estação: anda até a borda e desce
+        w.state = 'descend';
+        w.sy = w.y;
+        w.depth = w.sy;
+      } else w.state = 'enter';
     } else if (g.k === 'bench' && w.seat) {
       w.state = 'sitDown';
       w.t = 0;
@@ -667,6 +693,41 @@ export class KuPeople {
           this.stats.entered++;
         }
         break;
+      case 'descend': {
+        w.t += dt;
+        w.facing = 'u';
+        w.frame = Math.floor(w.t * 8) & 3;
+        if (w.t < STAIR_WALK) {
+          w.y = w.sy - STAIR_UP * (w.t / STAIR_WALK);
+        } else {
+          w.y = w.sy - STAIR_UP;
+          w.lip = w.y;
+          w.drop = Math.min(STAIR_DEPTH, ((w.t - STAIR_WALK) / STAIR_SINK) * STAIR_DEPTH);
+          if (w.drop >= STAIR_DEPTH) {
+            w.dead = true;
+            this.stats.entered++;
+          }
+        }
+        break;
+      }
+      case 'ascend': {
+        w.t += dt;
+        w.facing = 'd';
+        w.frame = Math.floor(w.t * 8) & 3;
+        if (w.t < STAIR_SINK) {
+          w.drop = STAIR_DEPTH * (1 - w.t / STAIR_SINK);
+        } else {
+          w.drop = 0;
+          w.lip = undefined;
+          const k = Math.min(1, (w.t - STAIR_SINK) / STAIR_WALK);
+          w.y = w.sy - STAIR_UP + STAIR_UP * k;
+          if (k >= 1) {
+            w.y = w.sy;
+            this.nextGoal(w);
+          }
+        }
+        break;
+      }
       case 'exitDoor':
         w.t += dt;
         w.alpha = Math.min(1, w.t / 0.4);
@@ -793,7 +854,7 @@ export class KuPeople {
         break;
       }
     }
-    if (w.pose === 'stand') w.depth = w.y;
+    if (w.pose === 'stand' && w.state !== 'descend' && w.state !== 'ascend') w.depth = w.y;
   }
 
   sprite(w: Walker): PersonSprite {
