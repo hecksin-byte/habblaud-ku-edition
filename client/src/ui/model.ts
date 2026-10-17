@@ -293,11 +293,23 @@ export function aggregateTasks(agents: readonly Pick<AgentInfo, 'tasks'>[]): Tas
 
 // ---------------------------------------------------------------- agrupamento e filtros
 
+/** "Ativo agora": trabalhando, esperando você ou rodando um shell, ou que fez algo nos últimos 30 minutos. */
+export const ACTIVE_WINDOW_MS = 30 * 60_000;
+
+export function isActiveNow(a: AgentInfo, now: number): boolean {
+  if (a.status === 'working' || a.status === 'waiting' || a.status === 'shell' || (a.shells?.length ?? 0) > 0) return true;
+  if (a.status === 'offline' || a.status === 'done') return false;
+  // `lastEventAt` o servidor renova ao reler a sessão (reinício); a última atividade de verdade é a que conta.
+  return !!a.activity && now - a.activity.at < ACTIVE_WINDOW_MS;
+}
+
 export interface AgentFilter {
   /** Texto livre: nome, papel, título, sala, caminho ou conta. */
   query: string;
   /** Contas ocultas (AccountInfo.id). */
   hiddenAccounts: ReadonlySet<string>;
+  /** Só quem está ativo agora (isActiveNow); o escritório em si continua mostrando todos. */
+  onlyActive?: boolean;
 }
 
 export interface AgentNode {
@@ -355,13 +367,15 @@ const byArrival = (a: AgentInfo, b: AgentInfo) => a.startedAt - b.startedAt || a
  * Com filtro: um principal aparece se ele ou algum subagente bater; se o principal bate, todos os subs aparecem.
  * Salas sem nenhum agente visível são omitidas (exceto sem filtro ativo).
  */
-export function groupRooms(snap: Pick<OfficeSnapshot, 'rooms' | 'agents' | 'accounts'> | null, filter?: AgentFilter): RoomGroup[] {
+export function groupRooms(snap: Pick<OfficeSnapshot, 'rooms' | 'agents' | 'accounts'> & Partial<Pick<OfficeSnapshot, 'serverTime'>> | null, filter?: AgentFilter): RoomGroup[] {
   if (!snap) return [];
   const accounts = new Map(snap.accounts.map((a) => [a.id, a]));
   const accountOrder = new Map(snap.accounts.map((a, i) => [a.id, i]));
   const query = filter?.query.trim() ?? '';
   const hidden = filter?.hiddenAccounts ?? new Set<string>();
-  const filtering = query.length > 0 || hidden.size > 0;
+  const onlyActive = filter?.onlyActive === true;
+  const now = snap.serverTime ?? Date.now();
+  const filtering = query.length > 0 || hidden.size > 0 || onlyActive;
 
   const byRoom = new Map<string, AgentInfo[]>();
   for (const a of snap.agents) {
@@ -373,7 +387,7 @@ export function groupRooms(snap: Pick<OfficeSnapshot, 'rooms' | 'agents' | 'acco
   const groups: RoomGroup[] = [];
   for (const room of [...snap.rooms].sort((a, b) => a.slot - b.slot)) {
     const agents = (byRoom.get(room.id) ?? []).slice().sort(byArrival);
-    const visible = (a: AgentInfo) => !hidden.has(a.account) && matchesQuery(a, room, accounts.get(a.account), query);
+    const visible = (a: AgentInfo) => !hidden.has(a.account) && (!onlyActive || isActiveNow(a, now)) && matchesQuery(a, room, accounts.get(a.account), query);
     const ids = new Set(agents.map((a) => a.id));
     const subsOf = new Map<string, AgentInfo[]>();
     const top: AgentInfo[] = [];
@@ -392,7 +406,7 @@ export function groupRooms(snap: Pick<OfficeSnapshot, 'rooms' | 'agents' | 'acco
     for (const a of top) {
       const subs = subsOf.get(a.id) ?? [];
       const selfVisible = visible(a);
-      const visibleSubs = selfVisible ? subs.filter((s) => !hidden.has(s.account)) : subs.filter(visible);
+      const visibleSubs = selfVisible ? subs.filter((s) => !hidden.has(s.account) && (!onlyActive || isActiveNow(s, now))) : subs.filter(visible);
       if (!selfVisible && visibleSubs.length === 0) continue;
       matches += (selfVisible ? 1 : 0) + visibleSubs.length;
       nodes.push({ agent: a, subs: visibleSubs, subTotal: subs.length });

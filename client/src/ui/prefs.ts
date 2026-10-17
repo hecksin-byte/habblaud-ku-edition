@@ -26,6 +26,8 @@ export interface UiPrefs {
   hiddenAccounts: string[];
   /** Ocultar da tela os agentes parados há N dias ou mais (0 = nunca). A sessão não é tocada. */
   hideIdleDays: IdleHideDays;
+  /** Lista lateral: só os agentes ativos agora (trabalhando, esperando você ou ativos nos últimos 30 min). */
+  onlyActive: boolean;
   /** Agentes arquivados pelo botão do agente (só somem da tela; dá para trazer de volta nas configurações). */
   archived: ArchivedEntry[];
   /** Nomes escolhidos para as contas (AccountInfo.id -> nome), mostrados no lugar de "Conta A" etc. */
@@ -45,6 +47,7 @@ export const DEFAULT_PREFS: UiPrefs = {
   feedOpen: true,
   hiddenAccounts: [],
   hideIdleDays: 0,
+  onlyActive: false,
   archived: [],
   accountNames: {},
 };
@@ -116,6 +119,7 @@ export function sanitizePrefs(raw: unknown): UiPrefs {
     feedOpen: bool(o.feedOpen, d.feedOpen),
     hiddenAccounts: Array.isArray(o.hiddenAccounts) ? o.hiddenAccounts.filter((x): x is string => typeof x === 'string').slice(0, 20) : [],
     hideIdleDays: sanitizeIdleDays(o.hideIdleDays),
+    onlyActive: bool(o.onlyActive, d.onlyActive),
     archived: sanitizeArchived(o.archived),
     accountNames: sanitizeAccountNames(o.accountNames),
   };

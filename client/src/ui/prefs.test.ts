@@ -161,3 +161,12 @@ describe('nomes das contas', () => {
     expect(hideFilterFrom({ ...DEFAULT_PREFS, accountNames: { a: 'B' } }).accountNames).toEqual({ a: 'B' });
   });
 });
+
+describe('onlyActive', () => {
+  it('desligado por padrão e só aceita booleano', () => {
+    expect(DEFAULT_PREFS.onlyActive).toBe(false);
+    expect(sanitizePrefs({}).onlyActive).toBe(false);
+    expect(sanitizePrefs({ onlyActive: true }).onlyActive).toBe(true);
+    expect(sanitizePrefs({ onlyActive: 'sim' }).onlyActive).toBe(false);
+  });
+});

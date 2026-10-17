@@ -9,6 +9,7 @@ import {
   FOREGROUND_WAIT_MS,
   groupRooms,
   hasRunningShells,
+  isActiveNow,
   matchesQuery,
   mergeHistory,
   roleLabel,
@@ -353,5 +354,44 @@ describe('textos da espera', () => {
     expect(shellDoneKind({ tool: 'ShellDone', error: true })).toBe('fail');
     expect(shellDoneKind({ tool: 'Bash', error: true })).toBeNull();
     expect(shellDoneKind(undefined)).toBeNull();
+  });
+});
+
+describe('só os ativos agora', () => {
+  const NOW = 1_000_000_000_000;
+  const MIN = 60_000;
+  const act = (minAgo: number) => ({ id: 'x', at: NOW - minAgo * MIN, kind: 'read', icon: '📖', text: 'Lendo x' }) as AgentInfo['activity'];
+  const list: AgentInfo[] = [
+    agent({ id: 'trabalhando', roomId: 'api', status: 'working' }),
+    agent({ id: 'esperando', roomId: 'api', status: 'waiting' }),
+    agent({ id: 'recente', roomId: 'loja', status: 'idle', activity: act(10) }),
+    agent({ id: 'velho', roomId: 'loja', status: 'idle', activity: act(120) }),
+    agent({ id: 'sem-atividade', roomId: 'site', status: 'idle', lastEventAt: NOW }), // lastEventAt é renovado ao reler a sessão: não conta
+    agent({ id: 'saiu', roomId: 'site', status: 'offline', activity: act(1) }),
+  ];
+
+  it('isActiveNow: trabalhando, esperando, shell ou ativo nos últimos 30 min', () => {
+    const by = (id: string) => list.find((a) => a.id === id)!;
+    expect(['trabalhando', 'esperando', 'recente', 'velho', 'sem-atividade', 'saiu'].map((id) => isActiveNow(by(id), NOW))).toEqual([true, true, true, false, false, false]);
+    expect(isActiveNow(agent({ id: 'k', roomId: 'x', status: 'idle', shells: [{ id: 'j' } as ShellJob] }), NOW)).toBe(true);
+  });
+
+  it('groupRooms com onlyActive só traz os ativos e tira as salas que ficaram vazias', () => {
+    const r = [room('api', 0), room('loja', 1), room('site', 2)];
+    const all = groupRooms({ rooms: r, agents: list, accounts, serverTime: NOW });
+    expect(all.map((g) => g.room.id)).toEqual(['api', 'loja', 'site']);
+    const active = groupRooms({ rooms: r, agents: list, accounts, serverTime: NOW }, { query: '', hiddenAccounts: new Set(), onlyActive: true });
+    expect(active.map((g) => [g.room.id, g.nodes.map((n) => n.agent.id).sort()])).toEqual([
+      ['api', ['esperando', 'trabalhando']],
+      ['loja', ['recente']],
+    ]);
+  });
+
+  it('subagente ativo mantém o principal parado na lista', () => {
+    const r = [room('api', 0)];
+    const pai = agent({ id: 'pai', roomId: 'api', status: 'idle', activity: act(300) });
+    const sub = agent({ id: 'filho', kind: 'sub', parentId: 'pai', roomId: 'api', status: 'working' });
+    const g = groupRooms({ rooms: r, agents: [pai, sub], accounts, serverTime: NOW }, { query: '', hiddenAccounts: new Set(), onlyActive: true });
+    expect(g[0].nodes.map((n) => [n.agent.id, n.subs.map((x) => x.id)])).toEqual([['pai', ['filho']]]);
   });
 });

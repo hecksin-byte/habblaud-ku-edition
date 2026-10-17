@@ -44,6 +44,8 @@ export class Sidebar implements UiComponent {
   private filterList: KeyedList<AccountInfo, HTMLButtonElement>;
   private scroller: HTMLElement;
   private hiddenNote: HTMLButtonElement;
+  /** "Só os ativos": a lista mostra só quem está trabalhando, esperando você ou ativo nos últimos 30 min. */
+  private activeBtn: HTMLButtonElement;
   private rooms: KeyedList<RoomGroup>;
   private roomRefs = new WeakMap<HTMLElement, RoomRefs>();
   private nodeRefs = new WeakMap<HTMLElement, NodeRefs>();
@@ -84,6 +86,14 @@ export class Sidebar implements UiComponent {
     searchIcon.innerHTML = ICONS.search;
     const search = h('label', { class: 'ui-search' }, searchIcon, this.input, h('kbd', { class: 'ui-kbd', text: '/', title: tr('Atalho: /') }));
 
+    this.activeBtn = h('button', {
+      class: 'ui-active-filter',
+      type: 'button',
+      text: tr('Só os ativos agora'),
+      title: tr('Mostra na lista só quem está trabalhando, esperando você ou ativo nos últimos 30 minutos. O escritório continua mostrando todos.'),
+      attrs: { 'aria-pressed': 'false' },
+      on: { click: () => this.ctx.updatePrefs({ onlyActive: !this.ctx.prefs.onlyActive }) },
+    }) as HTMLButtonElement;
     this.filters = h('div', { class: 'ui-acc-filters', role: 'group', attrs: { 'aria-label': tr('Filtrar por conta') } });
     this.filterList = new KeyedList<AccountInfo, HTMLButtonElement>(this.filters, {
       animate: false,
@@ -122,7 +132,7 @@ export class Sidebar implements UiComponent {
         click: () => {
           this.input.value = '';
           this.query = '';
-          this.ctx.updatePrefs({ hiddenAccounts: [] });
+          this.ctx.updatePrefs({ hiddenAccounts: [], onlyActive: false });
         },
       },
     });
@@ -136,7 +146,7 @@ export class Sidebar implements UiComponent {
     this.el = h(
       'aside',
       { class: 'ui-panel ui-sidebar', attrs: { 'aria-label': tr('Salas e agentes'), id: 'ui-sidebar' } },
-      h('div', { class: 'ui-side__head' }, h('div', { class: 'ui-side__title' }, h('h2', { text: tr('Escritório') }), close), search, this.filters),
+      h('div', { class: 'ui-side__head' }, h('div', { class: 'ui-side__title' }, h('h2', { text: tr('Escritório') }), close), search, this.activeBtn, this.filters),
       this.scroller,
     );
   }
@@ -154,11 +164,14 @@ export class Sidebar implements UiComponent {
     setHidden(this.filters, accounts.length <= 1);
 
     // Ordem das salas escolhida pelo usuário (arrastando o cabeçalho da sala).
-    const groups = orderRooms(groupRooms(snap, { query: this.query, hiddenAccounts: hidden }), (g) => g.room.id);
+    const onlyActive = this.ctx.prefs.onlyActive;
+    setAttr(this.activeBtn, 'aria-pressed', String(onlyActive));
+    this.activeBtn.classList.toggle('is-on', onlyActive);
+    const groups = orderRooms(groupRooms(snap, { query: this.query, hiddenAccounts: hidden, onlyActive }), (g) => g.room.id);
     this.shownRooms = groups.map((g) => g.room.id);
     this.rooms.sync(groups);
 
-    const filtering = this.query.trim().length > 0 || hidden.size > 0;
+    const filtering = this.query.trim().length > 0 || hidden.size > 0 || onlyActive;
     const total = snap?.agents.length ?? 0;
     // Escritório vazio sem filtro: o cartão central já explica; a lista não repete o aviso.
     const showEmpty = groups.length === 0 && (filtering || !officeIsEmpty(this.ctx));
@@ -172,7 +185,9 @@ export class Sidebar implements UiComponent {
         filtering && total > 0
           ? this.query.trim()
             ? tr('Nenhum agente encontrado para “{0}”.', [this.query.trim()])
-            : tr('Nenhum agente nas contas selecionadas.')
+            : hidden.size > 0
+              ? tr('Nenhum agente nas contas selecionadas.')
+              : tr('Nenhum agente ativo agora.')
           : tr('Nenhuma sessão aberta no momento.'),
       );
       setHidden(this.clearBtn, !(filtering && total > 0));
